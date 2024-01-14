@@ -1,0 +1,218 @@
+---
+title: "final_analysis"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-10-25"
+---
+
+```{r}
+library(tidyverse)
+library(lmerTest)
+library(lme4)
+library(brms)
+library(ggmcmc)
+library(mcmcplots)
+library(rstanarm)
+library(RColorBrewer) # needed for some extra colours in one of the graphs
+library(bayesplot)
+library(ggplot2)
+library(dplyr)
+library(tidybayes)
+library(modelr)
+```
+
+```{r}
+dataset = read_csv("./final_study_data_v2.csv",
+                   col_types = cols(Condition_ID=col_factor(levels=c("no", "wrong", "correct")),
+                                    POS = col_factor(levels = c("Closed","Open")))
+                   )
+dataset$POS <- factor(dataset$POS)
+dataset$Condition_ID <- factor(dataset$Condition_ID)
+dataset$Subject_ID <- factor(dataset$Subject_ID)
+dataset$Group <- factor(dataset$Group)
+dataset$WordToken <- factor(dataset$WordToken)
+dataset$Word <- factor(dataset$Word)
+
+sentence_counts <- dataset %>%
+  group_by(Subject_ID, Condition_ID) %>%
+  summarise(sentences_count = n_distinct(Sentence))
+
+# Calculate the error rate using the formula
+error_rates <- sentence_counts %>%
+  mutate(error_rate = (12 - sentences_count) / 12)
+
+print(error_rates)
+model <- lmer(error_rate ~ Condition_ID + (1|Subject_ID), data = error_rates)
+summary(model)
+
+filtered_data11 <- dataset %>% filter(Condition_ID!='wrong')
+filtered_data11$Condition_ID <- relevel(filtered_data11$Condition_ID, ref = "correct")
+filtered_data11$POS <- relevel(filtered_data11$POS, ref = "Open")
+filtered_data11$Condition_ID <- droplevels(filtered_data11$Condition_ID)
+contrasts(filtered_data11$Condition_ID) <- "contr.sum"
+contrasts(filtered_data11$POS) <- "contr.sum"
+```
+```{r}
+filtered_data12 <- dataset %>% filter(Condition_ID!='no')
+filtered_data12$Condition_ID <- relevel(filtered_data12$Condition_ID, ref = "correct")
+filtered_data12$POS <- relevel(filtered_data12$POS, ref = "Open")
+filtered_data12$Condition_ID <- droplevels(filtered_data12$Condition_ID)
+contrasts(filtered_data12$Condition_ID) <- "contr.sum"
+contrasts(filtered_data12$POS) <- "contr.sum"
+```
+
+
+```{r}
+# Seeing the effects of Condition_ID for poorly grounded words to see if there's facilitation. 
+# Considering slow-downs for correct vs no and correct vs wrong conditions
+filtered_data2 <- dataset %>% filter(POS=='Closed')
+filtered_data2$POS <- droplevels(filtered_data2$POS)
+filtered_data2$Condition_ID <- relevel(filtered_data2$Condition_ID, ref = "correct")
+contrasts(filtered_data2$Condition_ID)
+
+```
+
+
+# Analysis With BRMS model
+
+```{r}
+model1_brms = brm(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + (Condition_ID*POS + gpt2_surp | Subject_ID) +
+              (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+              data=filtered_data11, warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+
+
+
+```{r}
+summary(model1_brms)
+contrasts(filtered_data11$Condition_ID)
+contrasts(filtered_data11$POS)
+```
+
+
+Down below i am checking the PSRF values from the Gelman-Rubin Diagnostic (using the within and between chain variability).
+You should look at the Upper CI/Upper limit, which are all should be close to 1.
+
+```{r}
+model1posterior <- as.mcmc(model1_brms)
+gelman.diag(model1posterior[, 1:5])
+```
+Also plotting the geweke diagnostics to make sure the first and last parts of each chain is below the z-score line
+
+```{r}
+geweke.plot(model1posterior[, 1:5])
+```
+
+The plots look good, we should look at the traceplots associated with the effects we care about to make sure the chains look 
+like they mixed well. 
+
+```{r}
+library(bayesplot)
+width <- 8  
+height <- 6  # Height in inches
+plot(model1_brms, plotfun = "trace", width=width, height=height)
+```
+
+Looks like the chains mixed well, no divergent chains visible in any random or fixed effects
+We should also look at the pp_check to make sure it makes sense and no further adjustment of prior is needed
+
+```{r}
+pp_check(model1_brms)
+```
+I think it looks okay, the model is acceptable
+
+```{r}
+model1transformed <- ggs(model1_brms) # the ggs function transforms the BRMS output into a longformat tibble, that we can use to make different types of plots.
+```
+
+Finally drawing the plots of the posterior distributions to make sure they look normal
+
+```{r}
+ggplot(filter(model1transformed, Parameter %in% c("b_Condition_ID1","b_Condition_ID1:POS1"), 
+              Iteration > 1000),
+       aes(x    = value,
+           fill = Parameter))+
+    geom_density(alpha = .5)+
+    geom_vline(xintercept = 0,
+             col        = "red",
+             size       = 1) +
+  scale_x_continuous(name   = "Value",
+                     limits = c(-80, 10))+ 
+  
+    geom_vline(xintercept = unlist(summary(model1_brms)$fixed[2,3:4]), col = "darkgreen", linetype = 2) +
+
+    geom_vline(xintercept = unlist(summary(model1_brms)$fixed[7,3:4]), col = "blue",       linetype = 2) +
+  theme_light()+
+   scale_fill_manual(name   =  'Parameters', 
+                     values = c("darkgreen" , "blue"), 
+                     labels = c(expression( " "  ~  gamma[Condition_ID1]), 
+                                expression( " "  ~  gamma[Condition_ID1:POS1])))+
+  labs(title = "Figure 2: Posterior Density of Eq. 1 model parameters with 95% CI lines")
+
+```
+
+
+```{r}
+saveRDS(model1_brms, 'final_11_brms.rds')
+```
+
+Repeating the same analysis but with correct vs wrong 
+
+
+```{r}
+model12_brms = brm(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + (Condition_ID*POS + gpt2_surp | Subject_ID) +
+              (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+              data=filtered_data12, warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+
+```{r}
+summary(model12_brms)
+```
+```{r}
+pp_check(model12_brms,ndraws = 100)
+```
+
+Here I am trying to explore the third question, if facilitation is still observable for poorly grounded words, 
+or closed class words, using all data from closed-class words
+
+```{r}
+model2_brms = brm(RT ~ Condition_ID + gpt2_surp + Frequency + Length + (Condition_ID + gpt2_surp | Subject_ID)
+             + (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken),
+             data=filtered_data2,warmup = 1000, iter = 4500, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+
+```{r}
+summary(model2_brms)
+```
+```{r}
+model2transformed <- ggs(model2_brms)
+```
+```{r}
+ggplot(filter(model2transformed, Parameter %in% c("b_Condition_IDwrong","b_Condition_IDno"), 
+              Iteration > 1000),
+       aes(x    = value,
+           fill = Parameter))+
+    geom_density(alpha = .5)+
+    geom_vline(xintercept = 0,
+             col        = "red",
+             size       = 1) +
+  scale_x_continuous(name   = "Value",
+                     limits = c(-50, 80))+ 
+        geom_vline(xintercept = unlist(summary(model2_brms)$fixed[2,3:4]), col = "red", linetype = 2) +
+    geom_vline(xintercept = unlist(summary(model2_brms)$fixed[3,3:4]), col = "darkgreen", linetype = 2) +
+  theme_light()+
+   scale_fill_manual(name   =  'Parameters', 
+                     values = c( "red","darkgreen"), 
+                     labels = c(expression( " "  ~  gamma[Condition_IDno]), 
+                                expression( " "  ~  gamma[Condition_IDwrong])))+
+  labs(title = "Figure 3: Posterior Density of Eq. 2. model parameters with 95% CI lines")
+```
+
+

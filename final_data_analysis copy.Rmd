@@ -1,0 +1,258 @@
+---
+title: "final_analysis"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-10-25"
+---
+
+```{r}
+library(tidyverse)
+library(lmerTest)
+library(lme4)
+library(brms)
+library(ggmcmc)
+library(mcmcplots)
+library(rstanarm)
+library(RColorBrewer) # needed for some extra colours in one of the graphs
+library(bayesplot)
+library(ggplot2)
+library(dplyr)
+library(tidybayes)
+library(modelr)
+```
+
+```{r}
+dataset = read_csv("./final_study_all_data_v2.csv",
+                   col_types = cols(Condition_ID=col_factor(levels=c("no", "wrong", "correct")),
+                                    POS = col_factor(levels = c("Closed","Open")))
+                   )
+dataset$POS <- factor(dataset$POS)
+dataset$Condition_ID <- factor(dataset$Condition_ID)
+dataset$Subject_ID <- factor(dataset$Subject_ID)
+dataset$Group <- factor(dataset$Group)
+dataset$WordToken <- factor(dataset$WordToken)
+dataset$Word <- factor(dataset$Word)
+```
+
+#Analyzing the error rates 
+
+```{r}
+error_dataset = read_csv("./error_ind.csv",col_types = cols(Condition_ID=col_factor(levels=c("correct", "no", "wrong"))))
+error_model = brm(correctness ~ Condition_ID + (Condition_ID | Sentence) + (Condition_ID | Subject_ID),family = "bernoulli", data=error_dataset,warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+
+
+```{r}
+summary(error_model)
+```
+
+
+#filtering dataset for correct vs no comparison
+```{r}
+filtered_data11 <- dataset %>% filter(Condition_ID!='wrong')
+filtered_data11$Condition_ID <- relevel(filtered_data11$Condition_ID, ref = "correct")
+filtered_data11$POS <- relevel(filtered_data11$POS, ref = "Open")
+filtered_data11$Condition_ID <- droplevels(filtered_data11$Condition_ID)
+contrasts(filtered_data11$Condition_ID) <- "contr.sum"
+contrasts(filtered_data11$POS) <- "contr.sum"
+contrasts(filtered_data11$Condition_ID)
+```
+
+#Filtering dataset for correct vs wrong comparison
+
+```{r}
+filtered_data12 <- dataset %>% filter(Condition_ID!='no')
+filtered_data12$Condition_ID <- relevel(filtered_data12$Condition_ID, ref = "correct")
+filtered_data12$POS <- relevel(filtered_data12$POS, ref = "Open")
+filtered_data12$Condition_ID <- droplevels(filtered_data12$Condition_ID)
+contrasts(filtered_data12$Condition_ID) <- "contr.sum"
+contrasts(filtered_data12$POS) <- "contr.sum"
+```
+
+#Filtering dataset for no vs wrong comparison
+
+```{r}
+filtered_data13 <- dataset %>% filter(Condition_ID!='correct')
+filtered_data13$Condition_ID <- relevel(filtered_data13$Condition_ID, ref = "no")
+filtered_data13$POS <- relevel(filtered_data13$POS, ref = "Open")
+filtered_data13$Condition_ID <- droplevels(filtered_data13$Condition_ID)
+contrasts(filtered_data13$Condition_ID) <- "contr.sum"
+contrasts(filtered_data13$POS) <- "contr.sum"
+```
+
+
+```{r}
+# Seeing the effects of Condition_ID for poorly grounded words to see if there's facilitation. 
+# Considering slow-downs for correct vs no and correct vs wrong conditions
+filtered_data2 <- dataset %>% filter(POS=='Closed')
+filtered_data2$POS <- droplevels(filtered_data2$POS)
+filtered_data2$Condition_ID <- relevel(filtered_data2$Condition_ID, ref = "correct")
+contrasts(filtered_data2$Condition_ID)
+
+```
+
+
+# Analysis With BRMS model, analysis 1 - correct vs no
+
+```{r}
+model11_brms = brm(RT ~ Condition_ID*groundedness + gpt2_surp + Frequency + Length + (Condition_ID*groundedness + gpt2_surp | Subject_ID) +
+              (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+              data=filtered_data11, warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+
+```{r}
+summary(model11_brms)
+```
+
+```{r}
+conditional_effects(model11_brms)
+```
+
+```{r}
+model11_brms_pos = brm(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + (Condition_ID*POS + gpt2_surp | Subject_ID) +
+              (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+              data=filtered_data11, warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+
+```{r}
+saveRDS(model11_brms, 'saved_models/model11_brms.rds')
+saveRDS(model11_brms_pos, 'saved_models/model11_brms_pos.rds')
+```
+
+# Analysis with BRMS model, analysis 1 - correct vs wrong
+
+```{r}
+model12_brms = brm(RT ~ Condition_ID*groundedness + gpt2_surp + Frequency + Length + (Condition_ID*groundedness + gpt2_surp | Subject_ID) +
+              (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+              data=filtered_data12, warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+
+model12_brms_pos = brm(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + (Condition_ID*POS + gpt2_surp | Subject_ID) +
+                (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+                data=filtered_data12, warmup = 1000, iter = 4000, 
+                            cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                            seed = 123)
+```
+```{r}
+summary(model12_brms)
+```
+
+```{r}
+conditional_effects(model12_brms)
+```
+
+
+```{r}
+summary(model12_brms_pos)
+```
+```{r}
+saveRDS(model12_brms,'saved_models/model12_brms.rds')
+saveRDS(model12_brms_pos,'saved_models/model12_brms_pos.rds')
+```
+
+
+# Analysis with BRMS model, analysis 1 - no vs wrong
+
+```{r}
+model13_brms_pos = brm(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + (Condition_ID*POS + gpt2_surp | Subject_ID) +
+              (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+              data=filtered_data13, warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+```{r}
+summary(model13_brms_pos)
+```
+
+
+```{r}
+saveRDS(model13_brms_pos, 'saved_models/model13_brms_pos.rds')
+```
+
+
+# Comparison between blip2_surp and gpt2_surp, only using correct and wrong condition data
+
+```{r}
+model1_lmer = lmer(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + (Condition_ID*POS | Subject_ID)+ (Condition_ID | Group) + (Condition_ID | WordToken) + (Condition_ID | Word), data=filtered_data12, control = lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML = FALSE)
+
+model2_lmer = lmer(RT ~ Condition_ID*POS + blip2_surp + Frequency + Length + (Condition_ID*POS | Subject_ID)+ (Condition_ID | Group) + (Condition_ID | WordToken) + (Condition_ID | Word), data=filtered_data12, control = lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML = FALSE)
+
+anova(model1_lmer, model2_lmer)
+```
+
+```{r}
+saveRDS(model1_lmer,'saved_models/model1_lmer.rds')
+saveRDS(model2_lmer,'saved_models/model2_lmer.rds')
+```
+
+
+```{r}
+model_gpt2_brm = brm(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + (Condition_ID + gpt2_surp | Subject_ID)+ (Condition_ID | Group) + (Condition_ID | WordToken) + (Condition_ID | Word), data=filtered_data12,warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+
+model_blip_brm = brm(RT ~ Condition_ID*POS + blip2_surp + Frequency + Length + (Condition_ID + gpt2_surp | Subject_ID)+ (Condition_ID | Group) + (Condition_ID | WordToken) + (Condition_ID | Word), data=filtered_data12,warmup = 1000, iter = 4000, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+
+```
+
+
+```{r}
+saveRDS(model_blip_brm,'saved_models/model_blip_brm.rds')
+saveRDS(model_gpt2_brm,'saved_models/model_gpt2_brm.rds')
+```
+
+
+Now I am trying to explore the third question, if facilitation is still observable for poorly grounded words, 
+or closed class words, using all data from closed-class words
+
+```{r}
+model2_brms = brm(RT ~ Condition_ID + gpt2_surp + Frequency + Length + (Condition_ID + gpt2_surp | Subject_ID)
+             + (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken),
+             data=filtered_data2,warmup = 1000, iter = 4500, 
+                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                          seed = 123)
+```
+
+```{r}
+saveRDS(model2_brms,'saved_models/model2_brms.rds')
+```
+
+
+```{r}
+summary(model2_brms)
+```
+```{r}
+model2transformed <- ggs(model2_brms)
+```
+```{r}
+ggplot(filter(model2transformed, Parameter %in% c("b_Condition_IDwrong","b_Condition_IDno"), 
+              Iteration > 1000),
+       aes(x    = value,
+           fill = Parameter))+
+    geom_density(alpha = .5)+
+    geom_vline(xintercept = 0,
+             col        = "red",
+             size       = 1) +
+  scale_x_continuous(name   = "Value",
+                     limits = c(-50, 80))+ 
+        geom_vline(xintercept = unlist(summary(model2_brms)$fixed[2,3:4]), col = "red", linetype = 2) +
+    geom_vline(xintercept = unlist(summary(model2_brms)$fixed[3,3:4]), col = "darkgreen", linetype = 2) +
+  theme_light()+
+   scale_fill_manual(name   =  'Parameters', 
+                     values = c( "red","darkgreen"), 
+                     labels = c(expression( " "  ~  gamma[Condition_IDno]), 
+                                expression( " "  ~  gamma[Condition_IDwrong])))+
+  labs(title = "Figure 3: Posterior Density of Eq. 2. model parameters with 95% CI lines")
+```
+
+
