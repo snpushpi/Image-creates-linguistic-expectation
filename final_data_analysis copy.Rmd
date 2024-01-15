@@ -109,6 +109,10 @@ model11_brms = brm(RT ~ Condition_ID*groundedness + gpt2_surp + Frequency + Leng
 summary(model11_brms)
 ```
 
+
+
+
+
 ```{r}
 conditional_effects(model11_brms)
 ```
@@ -141,6 +145,22 @@ model12_brms_pos = brm(RT ~ Condition_ID*POS + gpt2_surp + Frequency + Length + 
                             cores = 6, chains = 2, control = list(adapt_delta = 0.85),
                             seed = 123)
 ```
+
+```{r}
+model12_brms_blip2 = brm(RT ~ Condition_ID*POS + blip2_surp + Frequency + Length + (Condition_ID*POS + blip2_surp | Subject_ID) +
+                (Condition_ID | Group) + (Condition_ID | Word) + (Condition_ID | WordToken), 
+                data=filtered_data12, warmup = 1000, iter = 4000, 
+                            cores = 6, chains = 2, control = list(adapt_delta = 0.85),
+                            seed = 123)
+```
+```{r}
+summary(model12_brms_blip2)
+```
+```{r}
+saveRDS(model12_brms_blip2,'saved_models/model12_brms_blip2.rds')
+```
+
+
 ```{r}
 summary(model12_brms)
 ```
