@@ -1,7 +1,7 @@
 # final_study_v2
  Analysis of the Second Version of the collected final data
 
-- final_v2_all_with_error_info.csv - it has all the data, error information in each word level from all particpants along with length, frequency, surprisal, groundedness, POS etc, so in the "correctness" column, you would see 3 categories - "correct","wrong" and "unavaiable". It means for each word in the sentence, the column indicates if the participant got it right or wrong or made a mistake in a previous word hence the data for that word is unavailable 
+- final_v2_all_with_error_info.csv - it has all the data, error information in each word level from all particpants along with length, frequency, surprisal, groundedness, POS etc, so in the "correctness" column, you would see 3 categories - "correct","wrong" and "unavaiable". It means for each word in the sentence, the column indicates if the participant got it right or wrong or made a mistake in a previous word hence the data for that word is unavailable. You would see also both First_RT and RT in the dataset. First_RT  collected RT for all correct and the only wrong word in a sentence if applicable, RT only collected reaction time correct words, so if correctness=="wrong" you would find the corresponding RT to be None. if correctness=="unavailable", both First_RT and RT will be None
 
 - (this isn't really important with the newer version of data) final_results_prelim_v2.csv, it’s essentially all the raw data with random information about the data(for example, timestamp, what each row means, #s etc) stripped off of the collected data of ibex, I also added Condition_ID there to help experimenting with error rate if needed, 
 
