@@ -21,7 +21,9 @@ library(tidyverse)
 ```
 
 
+
 ```{r}
+#correctness in the main dataset has 3 levels, correct, wrong and unavailable, check the Readme to learn more about final_v2_all_with_error_info.csv
 dataset_with_error <- read_csv("./final_v2_all_with_error_info.csv",
                    col_types = cols(Condition_ID=col_factor(levels=c("no", "wrong", "correct")),
                                     POS = col_factor(levels = c("Closed","Open")))
