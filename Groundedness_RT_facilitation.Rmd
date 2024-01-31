@@ -141,8 +141,40 @@ combined_df_no <- combined_df %>% filter(`Surp Diff to`=="Surp Diff to No Image"
 model_no <- glmer(RT_diff ~ Surp_diff + groundedness:POS + Frequency + Length + (Surp_diff + groundedness:POS + Frequency + Length | Group) + (1 | WordToken), data=combined_df_no)
 summary(model_no)
 ```
+# Error rate analysis 
 
-
+```{r}
+dataset_with_error_avg <- dataset_with_error %>% 
+  group_by(WordToken,Condition_ID,Group,correctness) %>%
+  summarize(blip2_surp=mean(blip2_surp)) %>%
+  group_by(Condition_ID,Group,correctness) %>%
+  summarize(blip2_surp=mean(blip2_surp)) %>%
+  group_by(Condition_ID,correctness) %>%
+  summarize(blip2_surp_avg=mean(blip2_surp),blip2_surp_se = sd(blip2_surp)/sqrt(n())) %>%
+  mutate(Condition=spelled_out_conditions[as.character(Condition_ID)]) %>%
+  filter(Condition_ID!='no')
+  
+```
+```{r}
+dataset_with_error_avg
+dataset_with_error_avg <- dataset_with_error_avg %>% rename(`Correctness Status of Words`=correctness)
+dataset_with_error_avg
+```
+```{r}
+my_dodge <- position_dodge(0.9)  
+ggplot(dataset_with_error_avg,aes(x=Condition,y=blip2_surp_avg,fill=`Correctness Status of Words`)) +
+    geom_bar(stat="identity", 
+           position=my_dodge,color = "black") +
+  geom_errorbar(aes(ymin=blip2_surp_avg-blip2_surp_se, ymax=blip2_surp_avg+blip2_surp_se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab("BLIP2_surprisal ± Standard Error") +
+  ylim(c(0,12)) +
+  #scale_fill_manual(values = c("orange", "green"))
+  theme_bw() +
+  theme(legend.position = c(0.5,0.93),
+        legend.direction="horizontal")
+#ggsave("img/gpt2_error.pdf",height=4,width=4)
+```
 
 # Error prediction model, Correct Vs wrong condition data
 
@@ -157,9 +189,17 @@ contrasts(dataset_here$POS) <- "contr.sum"
 #m_errors <- brm(correctness ~ Condition_ID*POS + blip2_surp + (Condition_ID | Subject_ID) + (Condition_ID | Group) + (Condition_ID | WordToken), data=dataset_here, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
 ```
 
+# Bigger brms model causes convergence issues
+
 ```{r}
 m_errors <- readRDS("saved_models/m_errors.RDS")
 ```
+
+```{r}
+m_errors_glmer <- glmer(correctness ~ Condition_ID*POS + kosmos2_surp + Frequency + Length + (Condition_ID*POS | Group) + (Condition_ID | Subject_ID) + (Condition_ID | WordToken) + (Condition_ID | Word), data=dataset_here, family="binomial",control = glmerControl(optimizer = "bobyqa"))
+```
+
+
 
 ```{r}
 summary(m_errors)
