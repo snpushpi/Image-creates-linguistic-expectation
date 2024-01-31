@@ -1,0 +1,179 @@
+---
+title: "Analysis of Groundedness, RT facilitation and Surprisal Difference"
+output: html_document
+date: "2024-01-31"
+---
+
+```{r}
+library(lmerTest)
+library(lme4)
+library(brms)
+library(ggmcmc)
+library(mcmcplots)
+library(rstanarm)
+library(RColorBrewer) # needed for some extra colours in one of the graphs
+library(bayesplot)
+library(ggplot2)
+library(dplyr)
+library(tidybayes)
+library(modelr)
+library(tidyverse)
+```
+
+
+```{r}
+dataset_with_error <- read_csv("./final_v2_all_with_error_info.csv",
+                   col_types = cols(Condition_ID=col_factor(levels=c("no", "wrong", "correct")),
+                                    POS = col_factor(levels = c("Closed","Open")))
+                   ) %>% filter(correctness != 'unavailable') 
+```
+
+
+
+# Surprisal Difference(different types of surprisals) & groundedness
+
+```{r}
+dataset_correct <- dataset_with_error %>% filter(correctness!='wrong')
+dat_grounding <- 
+  dataset_correct %>%
+  filter(Condition_ID != "no") %>%
+  group_by(WordToken,Subject_ID,Group,Condition_ID) %>%
+  summarize(POS=POS[1],gpt2_surp=mean(gpt2_surp),kosmos2_surp=mean(kosmos2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT))
+dat_grounding_by_word_token <-
+  dat_grounding %>%
+  group_by(WordToken,Group,Condition_ID) %>%
+  summarize(POS=POS[1],gpt2_surp=mean(gpt2_surp),kosmos2_surp=mean(kosmos2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT)) %>%
+  mutate(#groundedness=(10+groundedness)/2,
+         kosmos2_gpt2_surp_diff=kosmos2_surp-gpt2_surp,
+         Condition=ifelse(Condition_ID=="wrong","Wrong Image Preview","Correct Image Preview"),
+         `Part of Speech`=POS,
+         contingent_surp=ifelse(Condition_ID=="wrong",gpt2_surp,kosmos2_surp))
+
+model_surp_diff <- lmer(kosmos2_gpt2_surp_diff ~ 1 + `Part of Speech`:groundedness +  Length + Frequency + (`Part of Speech`:groundedness +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'))
+
+summary(model_surp_diff)
+```
+
+
+# Surprisal Difference (Same type) & groundedness
+
+```{r}
+dat_grounding <- 
+  dataset_correct %>%
+  filter(Condition_ID != "wrong") %>%
+  group_by(WordToken,Subject_ID,Group,Condition_ID) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT))
+
+dat_grounding_by_word_token <-
+  dat_grounding %>%
+  group_by(WordToken,Group,Condition_ID) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT)) # %>%
+  #pivot_wider(names_from = Condition_ID, values_from = kosmos2_surp) ##%>%
+  #mutate(#groundedness=(10+groundedness)/2,
+         #kosmos2_surp_diff= wrong-correct,
+         #`Part of Speech`=POS)
+
+dat_grounding_by_word_token_correct <- dat_grounding_by_word_token %>% filter(Condition_ID=='correct') %>% select(-Condition_ID) 
+dat_grounding_by_word_token_no <- dat_grounding_by_word_token %>% filter(Condition_ID=='no') %>% select(-Condition_ID)
+
+```
+
+```{r}
+combined_df <- inner_join(dat_grounding_by_word_token_correct, dat_grounding_by_word_token_no, by = c("WordToken","Group","POS","groundedness","Frequency","Length")) %>%
+  mutate(kosmos2_surp_diff = kosmos2_surp.x - kosmos2_surp.y) %>%
+  mutate(RT_diff = RT.x - RT.y) %>%
+  select(-starts_with("kosmos2_surp.")) %>%
+  select(-starts_with("RT."))
+```
+
+```{r}
+ggplot(combined_df,aes(x=groundedness,y=kosmos2_surp_diff,color=POS)) +
+  geom_point() +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  xlim(c(-5,10)) +
+  ylim(c(-20,7)) +
+  xlab("Groundedness of Word in Correct Image") +
+  ylab("KOSMOS-2 surp diff(corrrect - no)") +
+  theme(legend.position = "top") #+
+  #facet_grid(.~Condition) 
+```
+
+
+```{r}
+model_surp_diff_same <- lmer(kosmos2_surp_diff ~ 1 + POS:groundedness +  Length + Frequency + (POS:groundedness +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'))
+```
+
+
+# RT facilitation & surprisal, groundedness
+
+
+```{r}
+dataset_with_error$RT <- as.numeric(dataset_with_error$RT)
+all_correct <- dataset_with_error %>% filter(correctness=="correct")
+rt_word_token_by_condition1 <- 
+  all_correct %>%
+  group_by(WordToken,groundedness,POS,Condition_ID, Group, Frequency, Length) %>%
+  summarize(RT=mean(RT)) %>%
+  pivot_wider(names_from=Condition_ID,values_from=RT) %>%
+  mutate(`RT Diff to Wrong Image`=wrong-correct,
+         `RT Diff to No Image`= no-correct) %>%
+  pivot_longer(cols=c(`RT Diff to Wrong Image`,`RT Diff to No Image`),names_to="RT Diff to",values_to="RT_diff")
+
+rt_word_token_by_condition2 <- 
+  all_correct %>%
+  group_by(WordToken,groundedness,POS,Condition_ID, Group, Frequency, Length) %>%
+  summarize(kosmos2_surp=mean(kosmos2_surp)) %>%
+  pivot_wider(names_from=Condition_ID,values_from=kosmos2_surp, names_prefix = "kosmos2surp_") %>%
+  mutate(`Surp Diff to Wrong Image`=kosmos2surp_wrong-kosmos2surp_correct,
+         `Surp Diff to No Image`=kosmos2surp_no-kosmos2surp_correct) %>%
+  pivot_longer(cols=c(`Surp Diff to Wrong Image`,`Surp Diff to No Image`),names_to="Surp Diff to",values_to="Surp_diff")
+
+combined_df <- inner_join(rt_word_token_by_condition1,rt_word_token_by_condition2)
+
+combined_df$`Surp Diff to` <- factor(combined_df$`Surp Diff to`)
+
+combined_df_wrong <- combined_df %>% filter(`Surp Diff to`=="Surp Diff to Wrong Image")
+model_wrong <- glmer(RT_diff ~ Surp_diff + groundedness:POS + Frequency + Length + (Surp_diff + groundedness:POS + Frequency + Length | Group) + (1 | WordToken), data=combined_df_wrong)
+summary(model_wrong)
+
+combined_df_no <- combined_df %>% filter(`Surp Diff to`=="Surp Diff to No Image")
+model_no <- glmer(RT_diff ~ Surp_diff + groundedness:POS + Frequency + Length + (Surp_diff + groundedness:POS + Frequency + Length | Group) + (1 | WordToken), data=combined_df_no)
+summary(model_no)
+```
+
+
+
+# Error prediction model, Correct Vs wrong condition data
+
+```{r}
+dataset_here <- dataset_with_error %>% filter(Condition_ID!='no')
+dataset_here$Condition_ID <- relevel(dataset_here$Condition_ID, ref = "correct")
+dataset_here$POS <- relevel(dataset_here$POS, ref = "Open")
+dataset_here$Condition_ID <- droplevels(dataset_here$Condition_ID)
+contrasts(dataset_here$Condition_ID) <- "contr.sum"
+contrasts(dataset_here$POS) <- "contr.sum"
+
+#m_errors <- brm(correctness ~ Condition_ID*POS + blip2_surp + (Condition_ID | Subject_ID) + (Condition_ID | Group) + (Condition_ID | WordToken), data=dataset_here, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+```
+
+```{r}
+m_errors <- readRDS("saved_models/m_errors.RDS")
+```
+
+```{r}
+summary(m_errors)
+```
+
+# Correct Vs no
+
+```{r}
+
+```
+
+# No Vs Wrong 
+
+I would like to know if there's a better way to do the above analysis without running 3 models 
+```{r}
+
+```
