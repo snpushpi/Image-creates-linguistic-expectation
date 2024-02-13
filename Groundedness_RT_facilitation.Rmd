@@ -1,10 +1,12 @@
 ---
 title: "Analysis of Groundedness, RT facilitation and Surprisal Difference"
-output: html_document
+output: 
+  html_document:
+    toc: true
 date: "2024-01-31"
 ---
 
-```{r,Echo=FALSE}
+```{r,echo=FALSE}
 library(lmerTest)
 library(lme4)
 library(brms)
@@ -22,6 +24,7 @@ library(gridExtra) # for grid.arrange() to print plots side-by-side
 library(languageR)
 library(arm)
 library(boot)
+library(broom.mixed)
 ```
 
 Loading the dataset here, correctness in that dataset has 3 levels, correct, wrong and unavailable, check the Readme to learn more about final_v2_all_with_error_info.csv
@@ -43,8 +46,6 @@ So I have 4 models with the following predictors -
 2. with groundedness and gpt2_surp (that will help explain the effect of groundedness change since gpt2 is just text only)
 3. with POS and kosmos2_surp (that will help explain to what extent the effect of POS and condition_ID gets explained by the image conditioned surprisal)
 4. with groundedness and kosmos2_surp (that will help explain to what extent groundedness gets explained y the surprisal)
-
-A very important detail, in the model below I am using the surprisal from text model only(gpt2), using surprisal from kosmos2 means I don't see any effect from 
 
 ```{r}
 dataset_with_error$Condition_ID.helm <- dataset_with_error$Condition_ID
@@ -94,17 +95,18 @@ summary(RT_pred_brm_kosmos2_pos)
 
 ```
 
-just a sanity check below to make sure that observed significant difference between no vs wrong makes sense with the type of models I tried before, it's important to try this one because this version of the dataset I am analyzing has more data than the past one, because now I am considering all words until someone make a mistake, as opposed to only the sentences 
+just a sanity check below to make sure that observed significant difference between no vs wrong makes sense with the type of models I tried before, it's important to try this one because this version of the dataset I am analyzing has more data than the past one, because now I am considering all words until someone make a mistake, as opposed to only the sentences for a participant where they made no mistake
 
 ```{r}
 dataset_check <- dataset_cons %>% filter(Condition_ID!="correct")
 dataset_check$Condition_ID <- droplevels(dataset_check$Condition_ID)
 contrasts(dataset_check$Condition_ID) <- contr.sum(2)
 
-model_check <- brm(RT ~ Condition_ID*POS.sum + gpt2_surp + Frequency + Length + (Condition_ID*POS.sum + gpt2_surp | Subject_ID)+ (Condition_ID | Group) + (Condition_ID | WordToken) + (Condition_ID | Word), data=dataset_check, warmup = 1000, iter = 4000, 
-                          cores = 6, chains = 2, control = list(adapt_delta = 0.85),
-                          seed = 123)
+#model_check <- brm(RT ~ Condition_ID*POS.sum + gpt2_surp + Frequency + Length + (Condition_ID*POS.sum + gpt2_surp | Subject_ID)+ (Condition_ID | Group) + (Condition_ID | WordToken) + (Condition_ID | Word), data=dataset_check, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85), seed = 123)
+
+#summary(model_check)
 ```
+
 
 The sanity check is indeed showing that there is a significant difference in RT between wrong and no conditions as well, so the observations I am intepreting from the above models is correct.
 
@@ -116,12 +118,8 @@ For model (3), for 1 unit increase in groundedness score, there is no significan
 
 For model (4),(compare with model (1)) correct condition isn't significantly faster than the two other conditions, neither is wrong condition significantly slower than the two other conditions. The same statements hold for interaction effects as well. The effect of POS is not significant for Open words compared to closed class words in correct condition compared to the other two conditions. This again makes sense, given that the surprisal model we used was image conditioned, and hence we can expect to see the effect of correct Condition_ID being explained away by the surprisal model. 
 
-To summarize the facts above, I will make two plots, one with groundedness interpretations and another with POS and condition_ID interpretations
+To summarize the facts above, I will make two plots, one with groundedness interpretations and another with POS and condition_ID interpretations. Both plots will also have surprisals.
 
-```{r}
-install.packages("broom.mixed")
-library(broom.mixed)
-```
 
 
 ```{r}
@@ -206,7 +204,6 @@ dataset_with_error_avg <- dataset_with_error %>%
   summarize(blip2_surp=mean(blip2_surp)) %>%
   group_by(Condition_ID,correctness) %>%
   summarize(blip2_surp_avg=mean(blip2_surp),blip2_surp_se = sd(blip2_surp)/sqrt(n())) %>%
-  mutate(Condition=spelled_out_conditions[as.character(Condition_ID)]) %>%
   filter(Condition_ID!='no')
   
 ```
@@ -217,7 +214,7 @@ dataset_with_error_avg
 ```
 ```{r}
 my_dodge <- position_dodge(0.9)  
-ggplot(dataset_with_error_avg,aes(x=Condition,y=blip2_surp_avg,fill=`Correctness Status of Words`)) +
+ggplot(dataset_with_error_avg,aes(x=Condition_ID,y=blip2_surp_avg,fill=`Correctness Status of Words`)) +
     geom_bar(stat="identity", 
            position=my_dodge,color = "black") +
   geom_errorbar(aes(ymin=blip2_surp_avg-blip2_surp_se, ymax=blip2_surp_avg+blip2_surp_se), width=.2,
@@ -400,14 +397,14 @@ dat_grounding_by_word_token <-
          #kosmos2_surp_diff= wrong-correct,
          #`Part of Speech`=POS)
 
-dat_grounding_by_word_token_correct <- dat_grounding_by_word_token %>% filter(Condition_ID=='correct') %>% select(-Condition_ID) 
-dat_grounding_by_word_token_no <- dat_grounding_by_word_token %>% filter(Condition_ID=='no') %>% select(-Condition_ID)
+dat_grounding_by_word_token_correct <- dat_grounding_by_word_token %>% filter(Condition_ID=='correct') %>% dplyr::select(-'Condition_ID') 
+dat_grounding_by_word_token_no <- dat_grounding_by_word_token %>% filter(Condition_ID=='no') %>% dplyr::select(-Condition_ID)
 
 combined_df <- inner_join(dat_grounding_by_word_token_correct, dat_grounding_by_word_token_no, by = c("WordToken","Group","POS","groundedness","Frequency","Length")) %>%
   mutate(kosmos2_surp_diff = kosmos2_surp.x - kosmos2_surp.y) %>%
   mutate(RT_diff = RT.x - RT.y) %>%
-  select(-starts_with("kosmos2_surp.")) %>%
-  select(-starts_with("RT."))
+  dplyr::select(-starts_with("kosmos2_surp.")) %>%
+  dplyr::select(-starts_with("RT."))
 
 ggplot(combined_df,aes(x=groundedness,y=kosmos2_surp_diff,color=POS)) +
   geom_point() +
@@ -427,12 +424,15 @@ ggplot(combined_df,aes(x=groundedness,y=kosmos2_surp_diff,color=POS)) +
 model_surp_diff_same2 <- lmer(kosmos2_surp_diff ~ 1 + POS/groundedness + POS + groundedness +  Length + Frequency + (POS/groundedness + POS + Length + Frequency | Group) , data=combined_df, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
 ```
 
+
+
+
 ```{r}
 summary(model_surp_diff_same2)
 ```
 
 # RT facilitation & surprisal, groundedness
-The goal here is to understand how reaction time facilitation(no - correct & wrong - correct) relates to surprisal difference(no - correct & wrong - correct of the same model) and groundedness and if the linear relationship between them is strong(which will be relaxed in the next section). Also we will look into if RT_diff will need both surp_diff and groundedness as predictors, (so if both of these have significant effect on RT_diff) or if just one is good enough. 
+The goal here is to understand how reaction time facilitation(no - correct & wrong - correct) relates to surprisal difference(no - correct & wrong - correct of the same model) and groundedness and if the linear relationship between them is strong(linearity assumption will be relaxed in a later analysis). Also we will look into if RT_diff will need both surp_diff and groundedness as predictors, (so if both of these have significant effect on RT_diff) or if just one is good enough. 
 
 
 Looks like both surprisal difference & groundedness score has significant effect on RT facilitation, specially for well grounded or open class words. The best fitted model has been achieved after comparison with several models that are shown below. 
