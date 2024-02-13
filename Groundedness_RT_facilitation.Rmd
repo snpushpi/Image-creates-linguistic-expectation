@@ -133,23 +133,29 @@ model_A_fixed <- tidy(model_A, effects = "fixed")
 # Extract fixed effects for model B
 model_B_fixed <- tidy(model_B, effects = "fixed")
 
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
 combined_data <- rbind(
   transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
   transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
 )
-effects_of_interest <- c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness")
+effects_of_interest <- c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal")
 filtered_data <- combined_data %>% 
   filter(term %in% effects_of_interest)
 
 filtered_data$term <- factor(filtered_data$term)
 
-filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness"), labels = c("Wrong vs no","Correct vs wrong&no mean"))
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal"), labels = c("Wrong vs no for 1 unit increase in groundedness score","Correct vs wrong&no mean for 1 unit increase in groundedness score","1 unit increase in surprisal"))
 
 ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
   geom_bar(stat = "identity", position = position_dodge(width = .9), width = 0.4) +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
                 position = position_dodge(width = 0.9), width = 0.2) +
-  labs(x = "Effect", y = "RT facilitation", title = "RT facilitation for 1 unit increase in groundedness score") +
+  labs(x = "Effect", y = "Estimate and 95% CI") +
+  scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+    labs(x = "Effect", y = "RT facilitation estimate and 95% CI") +
   theme_minimal()
 ```
 
@@ -162,17 +168,20 @@ model_A_fixed <- tidy(model_A, effects = "fixed")
 # Extract fixed effects for model B
 model_B_fixed <- tidy(model_B, effects = "fixed")
 
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
 combined_data <- rbind(
   transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
   transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
 )
-effects_of_interest <- c("Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1","Condition_ID.helm1","Condition_ID.helm2")
+effects_of_interest <- c("Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1","Condition_ID.helm1","Condition_ID.helm2","surprisal")
 filtered_data <- combined_data %>% 
   filter(term %in% effects_of_interest)
 
 filtered_data$term <- factor(filtered_data$term)
 
-filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1"), labels = c("Wrong vs no","Correct vs wrong&no mean","Change in facilitation in Wrong vs no for open POS","Change in facilitation in Correct vs wrong&no mean for open POS"))
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1","surprisal"), labels = c("Wrong vs no","Correct vs wrong&no mean","Change in facilitation in Wrong vs no for open POS","Change in facilitation in Correct vs wrong&no mean for open POS","1 unit increase in surprisal"))
 
 ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
     geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.4) +
@@ -181,9 +190,166 @@ ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
   #scale_x_discrete(guide = guide_axis(n.dodge=3))+
   scale_x_discrete(labels = function(x) 
     stringr::str_wrap(x, width = 10))+
-    labs(x = "Effect", y = "RT facilitation") 
-    #theme(axis.text.x = element_text(angle = 90, hjust=1))
+    labs(x = "Effect", y = "RT facilitation estimate and 95% CI") +
+    theme_minimal()
+    #theme(axis.text.x = element_text(angle = 90, hjust=1)) 
 ```
+
+# Error rate analysis 
+In this section, I wanted to analyze the error rates and what is a good predictor of when people will make errors. On that note, I first analyzed the relationship between blip2 surprisal and error occurence 
+
+```{r}
+dataset_with_error_avg <- dataset_with_error %>% 
+  group_by(WordToken,Condition_ID,Group,correctness) %>%
+  summarize(blip2_surp=mean(blip2_surp)) %>%
+  group_by(Condition_ID,Group,correctness) %>%
+  summarize(blip2_surp=mean(blip2_surp)) %>%
+  group_by(Condition_ID,correctness) %>%
+  summarize(blip2_surp_avg=mean(blip2_surp),blip2_surp_se = sd(blip2_surp)/sqrt(n())) %>%
+  mutate(Condition=spelled_out_conditions[as.character(Condition_ID)]) %>%
+  filter(Condition_ID!='no')
+  
+```
+```{r}
+dataset_with_error_avg
+dataset_with_error_avg <- dataset_with_error_avg %>% rename(`Correctness Status of Words`=correctness)
+dataset_with_error_avg
+```
+```{r}
+my_dodge <- position_dodge(0.9)  
+ggplot(dataset_with_error_avg,aes(x=Condition,y=blip2_surp_avg,fill=`Correctness Status of Words`)) +
+    geom_bar(stat="identity", 
+           position=my_dodge,color = "black") +
+  geom_errorbar(aes(ymin=blip2_surp_avg-blip2_surp_se, ymax=blip2_surp_avg+blip2_surp_se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab("BLIP2_surprisal ± Standard Error") +
+  ylim(c(0,12)) +
+  #scale_fill_manual(values = c("orange", "green"))
+  theme_bw() +
+  theme(legend.position = c(0.5,0.93),
+        legend.direction="horizontal")
+#ggsave("img/gpt2_error.pdf",height=4,width=4)
+```
+
+```{r}
+contrasts(dataset_with_error$POS.sum)
+```
+
+
+# Error prediction model
+
+The same as before, we do the same kind of analysis, with 4 types of models and ask similar questions, make plots to demonstrate the results
+
+```{r}
+dataset_with_error$correctness <- factor(dataset_with_error$correctness)
+
+#rescaling the POS.sum to make sure that the model converges
+
+dataset_with_error$POS.helm <- dataset_with_error$POS
+contrasts(dataset_with_error$POS.helm) <- c(1/2,-1/2)
+#error_pred_gpt2_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + gpt2_surp + (Condition_ID.helm | Subject_ID) + (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+
+#saveRDS(error_pred_gpt2_pos_brm,'saved_models/error_pred_gpt2_pos_brm.RDS')
+error_pred_gpt2_pos_brm <- readRDS('saved_models/error_pred_gpt2_pos_brm.RDS')
+summary(error_pred_gpt2_pos_brm)
+
+
+#error_pred_gpt2_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + gpt2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_gpt2_groundedness_brm,'saved_models/error_pred_gpt2_groundedness_brm.RDS')
+error_pred_gpt2_groundedness_brm <- readRDS('saved_models/error_pred_gpt2_groundedness_brm.RDS')
+summary(error_pred_gpt2_groundedness_brm)
+
+#error_pred_kosmos2_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + kosmos2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+
+#saveRDS(error_pred_kosmos2_groundedness_brm, 'saved_models/error_pred_kosmos2_groundedness_brm.RDS')
+error_pred_kosmos2_groundedness_brm <- readRDS('saved_models/error_pred_kosmos2_groundedness_brm.RDS')
+summary(error_pred_kosmos2_groundedness_brm)
+
+#error_pred_brm_kosmos2_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + kosmos2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_brm_kosmos2_pos_brm,'saved_models/error_pred_brm_kosmos2_pos_brm.RDS')
+error_pred_kosmos2_pos_brm <- readRDS('saved_models/error_pred_brm_kosmos2_pos_brm.RDS')
+summary(error_pred_kosmos2_pos_brm)
+```
+
+
+```{r}
+library(broom.mixed)
+model_A <- error_pred_gpt2_groundedness_brm
+model_B <- error_pred_kosmos2_groundedness_brm
+
+
+model_A_fixed <- tidy(model_A, effects = "fixed")
+
+# Extract fixed effects for model B
+model_B_fixed <- tidy(model_B, effects = "fixed")
+
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
+combined_data <- rbind(
+  transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
+  transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
+)
+effects_of_interest <- c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal"), labels = c("Wrong vs no","Correct vs wrong&no mean","1 unit increase in Surprisal"))
+
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.4) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                position = position_dodge(width = 0.9), width = 0.2) +
+  labs(x = "Effect", y = "Estimate & 95% CI of difference in the predicted log odds") +
+    scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+  theme_minimal()
+```
+
+```{r}
+model_A <- error_pred_gpt2_pos_brm
+model_B <- error_pred_kosmos2_pos_brm
+
+model_A_fixed <- tidy(model_A, effects = "fixed")
+
+# Extract fixed effects for model B
+model_B_fixed <- tidy(model_B, effects = "fixed")
+
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
+combined_data <- rbind(
+  transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
+  transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
+)
+effects_of_interest <- c("Condition_ID.helm1:POS.helm1","Condition_ID.helm2:POS.helm1","Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","Condition_ID.helm1:POS.helm1","Condition_ID.helm2:POS.helm1","surprisal"), labels = c("Wrong vs no","Correct vs wrong&no mean","Change in facilitation in Wrong vs no for open POS","Change in facilitation in Correct vs wrong&no mean for open POS","1 unit increase in surprisal"))
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.4) +
+    geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                  position = position_dodge(width = 0.9), width = 0.2) +
+  #scale_x_discrete(guide = guide_axis(n.dodge=3))+
+  scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+    labs(x= "Effects", y = "Estimate & 95% CI of difference in the predicted log odds") +
+    theme_minimal()
+```
+
+
+
 
 # Surprisal Difference(different types of surprisals) & groundedness
 
@@ -378,40 +544,3 @@ ggplot(combined_df,aes(x=`Surp Diff to Wrong Image`,y=`RT Diff to Wrong Image`,c
 ```
 
 
-# Error rate analysis 
-In this section, I wanted to analyze the error rates and what is a good predictor of when people will make errors. On that note, I first analyzed the relationship between blip2 surprisal and error occurence 
-
-```{r}
-dataset_with_error_avg <- dataset_with_error %>% 
-  group_by(WordToken,Condition_ID,Group,correctness) %>%
-  summarize(blip2_surp=mean(blip2_surp)) %>%
-  group_by(Condition_ID,Group,correctness) %>%
-  summarize(blip2_surp=mean(blip2_surp)) %>%
-  group_by(Condition_ID,correctness) %>%
-  summarize(blip2_surp_avg=mean(blip2_surp),blip2_surp_se = sd(blip2_surp)/sqrt(n())) %>%
-  mutate(Condition=spelled_out_conditions[as.character(Condition_ID)]) %>%
-  filter(Condition_ID!='no')
-  
-```
-```{r}
-dataset_with_error_avg
-dataset_with_error_avg <- dataset_with_error_avg %>% rename(`Correctness Status of Words`=correctness)
-dataset_with_error_avg
-```
-```{r}
-my_dodge <- position_dodge(0.9)  
-ggplot(dataset_with_error_avg,aes(x=Condition,y=blip2_surp_avg,fill=`Correctness Status of Words`)) +
-    geom_bar(stat="identity", 
-           position=my_dodge,color = "black") +
-  geom_errorbar(aes(ymin=blip2_surp_avg-blip2_surp_se, ymax=blip2_surp_avg+blip2_surp_se), width=.2,
-                 position=position_dodge(.9)) +
-  ylab("BLIP2_surprisal ± Standard Error") +
-  ylim(c(0,12)) +
-  #scale_fill_manual(values = c("orange", "green"))
-  theme_bw() +
-  theme(legend.position = c(0.5,0.93),
-        legend.direction="horizontal")
-#ggsave("img/gpt2_error.pdf",height=4,width=4)
-```
-
-# Error prediction model (TODO)
