@@ -37,7 +37,7 @@ dataset_with_error <- read_csv("./final_v2_all_with_error_info.csv",
 ```
 
 
-# RT prediction model
+# RT prediction model 
 
 In this section, I am just running the basic RT prediction model with all 3 conditions at the same time. I am intrerested in comparing (i) correct-image vs the other two conditions; and (ii) no-image vs wrong-image. For that I am using reverse helmert coding on the Condition_ID to compare no-image condition with wrong-image condition and correct-image condition with no and wrong image conditions. Besides, I am using usual sum contrast on POS (1,-1). 
 
@@ -191,6 +191,67 @@ ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
     labs(x = "Effect", y = "RT facilitation estimate and 95% CI") +
     theme_minimal()
     #theme(axis.text.x = element_text(angle = 90, hjust=1)) 
+```
+# RT prediction model (only closed class POS)
+
+The goal of this section is to analyze if facilitation is present even for closed class words in correct condition. The encoding is the same as above, with wrong being compared to no(contrast 1 ) and correct being compared no wrong and no(contrast 2). The significance of the second contrast will tell us if facilitation for closed class words is significant in correct condition compared to the two other conditions. 
+
+I am running two models here again, to compare their effects.
+
+```{r}
+closed_data <- dataset_with_error %>% filter(POS=="Closed")
+closed_data$POS <- droplevels(closed_data$POS)
+
+#model_closed_gpt2 <- brm(RT ~ Condition_ID.helm + gpt2_surp + Frequency + Length + (Condition_ID.helm + gpt2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(model_closed_gpt2, 'saved_models/model_closed_gpt2')
+model_closed_gpt2 <- readRDS('saved_models/model_closed_gpt2')
+
+summary(model_closed_gpt2)
+#model_closed_kosmos2 <- brm(RT ~ Condition_ID.helm + kosmos2_surp + Frequency + Length + (Condition_ID.helm + kosmos2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(model_closed_kosmos2, 'saved_models/model_closed_kosmos2')
+model_closed_kosmos2 <- readRDS('saved_models/model_closed_kosmos2')
+
+summary(model_closed_kosmos2)
+```
+```{r}
+
+```
+
+```{r}
+model_A <- model_closed_gpt2
+model_B <- model_closed_kosmos2
+
+model_A_fixed <- tidy(model_A, effects = "fixed")
+
+# Extract fixed effects for model B
+model_B_fixed <- tidy(model_B, effects = "fixed")
+
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
+combined_data <- rbind(
+  transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
+  transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
+)
+effects_of_interest <- c("Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","surprisal"), labels = c("RT facilitation for Wrong vs no","RT facilitation for Correct vs wrong&no mean","RT facilitation for 1 unit increase in surprisal"))
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = .9), width = 0.4) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                position = position_dodge(width = 0.9), width = 0.2) +
+  labs(x = "Effect", y = "Estimate and 95% CI") +
+  scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+    labs(x = "Effect", y = "RT Facilitation Estimate and 95% CI, closed class words") +
+  theme_minimal()
 ```
 
 # Error rate analysis 
