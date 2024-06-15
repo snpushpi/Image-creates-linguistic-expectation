@@ -1810,7 +1810,7 @@ ggplot(data, aes(x = perplexity, y = log_likelihood_diff, color = Type,shape=Mod
   geom_point() + theme_bw() + 
   labs(x = "Perplexity", y = "Log Likelihood Difference") 
 ggsave("img/log_likelihood_diff_vs_perplexity.pdf")
-```
+f```
 ```{r}
 perplexity_all
 ```
