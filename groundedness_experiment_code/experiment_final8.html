@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>My experiment</title>
+  <script src="jspsych/jspsych.js"></script>
+  <script src="jspsych/plugin-html-keyboard-response.js"></script>
+  <script src="jspsych/plugin-html-button-response.js"></script>
+  <script src="jspsych/plugin-vertical-slider-response.js"></script>
+  <script src="jspsych/plugin-preload.js"></script>
+  <script src="jspsych/plugin-browser-check.js"></script>
+  <link href="jspsych/my_style.css" rel="stylesheet" type="text/css" />
+  <link href="jspsych/jspsych.css" rel="stylesheet" type="text/css" />
+  <style>
+    .jspsych-content #stim {
+      text-align: left;
+    }
+  </style>
+</head>
+
+<body></body>
+<script>
+  var timeline = [];
+
+  //https://app.prolific.co/submissions/complete?cc=CKENM4EE
+  var trial = {
+  type: jsPsychBrowserCheck,
+  inclusion_function: (data) => {
+    return ['chrome'].includes(data.browser);
+  },
+  exclusion_message: (data) => {
+    return `<p>You must use Chrome to complete this experiment.</p>`
+  },
+};
+  timeline.push(trial);
+  var preload = {
+      type: jsPsychPreload,
+      images: [
+  'img_final/000000426166.jpg',
+  'img_final/000000349594.jpg',
+  'img_final/000000374982.jpg',
+  'img_final/000000556873.jpg',
+  'img_final/000000192904.jpg',
+  'img_final/000000273642.jpg',
+  'img_final/000000173799.jpg',
+  'img_final/000000501523.jpg',
+  'img_final/000000127517.jpg',
+  'img_final/000000527029.jpg',
+  'img_final/000000394328.jpg',
+  'img_final/000000002157.jpg'
+]
+    };
+  timeline.push(preload);
+  var test_stimuli = [
+  {
+    image_stimuli: 'img_final/000000426166.jpg',
+    stimulus: 'A light blue bicycle chained to a pole on the sidewalk in front of a red building.'
+  },
+  {
+    image_stimuli: 'img_final/000000349594.jpg',
+    stimulus: 'A young boy is standing against a wall eating an apple.'
+  },
+  {
+    image_stimuli: 'img_final/000000374982.jpg',
+    stimulus: 'A young girl looking at a huge pizza with surprise.'
+  },
+  {
+    image_stimuli: 'img_final/000000556873.jpg',
+    stimulus: 'A white frosted cake sitting in front of some white flowers.'
+  },
+  {
+    image_stimuli: 'img_final/000000192904.jpg',
+    stimulus: 'A tray full of breakfast foods and drinks on a bed.'
+  },
+  {
+    image_stimuli: 'img_final/000000273642.jpg',
+    stimulus: 'A dog laying on its side with a remote control under its paw.'
+  },
+  {
+    image_stimuli: 'img_final/000000173799.jpg',
+    stimulus: 'Two men holding big wooden sticks with a lot of elephants in the background.'
+  },
+  {
+    image_stimuli: 'img_final/000000501523.jpg',
+    stimulus: 'A black cat sitting inside of a sink in the bathroom.'
+  },
+  {
+    image_stimuli: 'img_final/000000127517.jpg',
+    stimulus: 'A row of surfboards sticking out of the sand sitting next to each other.'
+  },
+  {
+    image_stimuli: 'img_final/000000527029.jpg',
+    stimulus: 'A man covering his eyes while standing next to multiple boxes filled with bananas.'
+  },
+  {
+    image_stimuli: 'img_final/000000394328.jpg',
+    stimulus: 'There is an indoor toilet underneath a sign that says please flush.'
+  },
+  {
+    image_stimuli: 'img_final/000000002157.jpg',
+    stimulus: 'A table topped with a cake covered in berries next to a plate of sandwiches.'
+  }
+];
+    function saveData(data){
+     var xhr = new XMLHttpRequest();
+     xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file described above.
+     xhr.setRequestHeader('Content-Type', 'application/json');
+     xhr.send(JSON.stringify({filedata: data}));
+   }
+function waiting() {
+  console.log("Please wait while we submit the results to the server...");
+
+  setTimeout(function() {
+    console.log("Thank you! Please manually enter code CKENM4EE on prolific to complete the study.");
+  }, 5000); // 5000 milliseconds = 5 seconds
+}
+  const jsPsych = initJsPsych({
+    on_finish: function () {
+      //jsPsych.data.displayData();
+      var useful_data = jsPsych.data.get().filter({trial_type:'html-vertical-slider-response'})
+      saveData(useful_data.ignore('slider_start').ignore('trial_index').ignore('time_elapsed').ignore('internal_node_id').csv());
+      window.location= "https://app.prolific.co/submissions/complete?cc=CJRFZBX9"
+      //saveData(jsPsych.data.get().csv());
+      // waiting();
+    }
+  });
+  var subject_id = jsPsych.data.getURLVariable('PROLIFIC_PID');
+
+    jsPsych.data.addProperties({
+    subject_id: subject_id,
+    });
+  const hello_trial0 = {
+    type: jsPsychHtmlButtonResponse,
+    trial_duration: 20000,
+    choices: ['Continue'],
+    response_ends_trial: false,
+    stimulus: '<p id="stim">Thank you for taking part in our study. In this study we will ask you to rate how present each word of a caption is in the associated image.</p><p id="stim"><b>Each word in a sentence can be given a rating on a scale of -10 to 10</b> where <b>10 means the word is very clearly present in the image,-10 means the word is very clearly not present in the image, and 0 is neutral</b> (the word is sort of present, you are not certain, or it is difficult to evaluate what it would mean for the word to be present).</p><p>An example is given below, the "Continue" button will take you to the next page after 30 seconds.</p><center><img src="img/two_cat.jpeg" width=500></center><div class="happy" id="check"><div class="jspsych-html-slider-response-container" id="box_0" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>Yesterday</h4><input type="range" orient="vertical" class="jspsych-slider" value="0" min="-10" max="10" id="jspsych-html-slider-response-response_0" disabled><span id="demo_2">0</span></div><div class="jspsych-html-slider-response-container" id="box_1" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>two</h4><input type="range" orient="vertical" class="jspsych-slider" value="10" min="-10" max="10" id="jspsych-html-slider-response-response_1" disabled><span id="demo_1">10</span></div><div class="jspsych-html-slider-response-container" id="box_2" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>cats</h4><input type="range" orient="vertical" class="jspsych-slider" value="10" min="-10" max="10" id="jspsych-html-slider-response-response_2" disabled><span id="demo_2">10</span></div><div class="jspsych-html-slider-response-container" id="box_3" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>were</h4><input type="range" orient="vertical" class="jspsych-slider" value="3" min="-10" max="10" id="jspsych-html-slider-response-response_3" disabled><span id="demo_3">3</span></div><div class="jspsych-html-slider-response-container" id="box_4" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>lying</h4><input type="range" orient="vertical" class="jspsych-slider" value="10" min="-10" max="10" id="jspsych-html-slider-response-response_4" disabled><span id="demo_4"></span>10</div><div class="jspsych-html-slider-response-container" id="box_5" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>on</h4><input type="range" orient="vertical" class="jspsych-slider" value="8" min="-10" max="10" id="jspsych-html-slider-response-response_5" disabled><span id="demo_5">8</span></div><div class="jspsych-html-slider-response-container" id="box_6" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>a</h4><input type="range" orient="vertical" class="jspsych-slider" value="1" min="-10" max="10" id="jspsych-html-slider-response-response_6" disabled><span id="demo_6">1</span></div><div class="jspsych-html-slider-response-container" id="box_7" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>pink</h4><input type="range" orient="vertical" class="jspsych-slider" value="10" min="-10" max="10" id="jspsych-html-slider-response-response_7" disabled><span id="demo_7">10</span></div><div class="jspsych-html-slider-response-container" id="box_8" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>blanket</h4><input type="range" orient="vertical" class="jspsych-slider" value="10" min="-10" max="10" id="jspsych-html-slider-response-response_8" disabled><span id="demo_8">10</span></div><div class="jspsych-html-slider-response-container" id="box_9" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>next</h4><input type="range" orient="vertical" class="jspsych-slider" value="5" min="-10" max="10" id="jspsych-html-slider-response-response_9" disabled><span id="demo_9">5</span></div><div class="jspsych-html-slider-response-container" id="box_10" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>to</h4><input type="range" orient="vertical" class="jspsych-slider" value="5" min="-10" max="10" id="jspsych-html-slider-response-response_10" disabled><span id="demo_10">5</span></div><div class="jspsych-html-slider-response-container" id="box_11" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>two</h4><input type="range" orient="vertical" class="jspsych-slider" value="10" min="-10" max="10" id="jspsych-html-slider-response-response_11" disabled><span id="demo_11">10</span></div><div class="jspsych-html-slider-response-container" id="box_12" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>remotes</h4><input type="range" orient="vertical" class="jspsych-slider" value="10" min="-10" max="10" id="jspsych-html-slider-response-response_12" disabled><span id="demo_12">10</span></div><div class="jspsych-html-slider-response-container" id="box_13" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>and</h4><input type="range" orient="vertical" class="jspsych-slider" value="0" min="-10" max="10" id="jspsych-html-slider-response-response_13" disabled><span id="demo_13">0</span></div><div class="jspsych-html-slider-response-container" id="box_14" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>a</h4><input type="range" orient="vertical" class="jspsych-slider" value="-1" min="-10" max="10" id="jspsych-html-slider-response-response_14" disabled><span id="demo_14">-1</span></div><div class="jspsych-html-slider-response-container" id="box_15" style="position:relative; margin: 0 auto 3em auto; width:auto; height:auto;"><h4>dog</h4><input type="range" orient="vertical" class="jspsych-slider" value="-10" min="-10" max="10" id="jspsych-html-slider-response-response_15" disabled><span id="demo_15">-10</span></div></div>'
+  }
+
+  timeline.push(hello_trial0);
+  var test = {
+    type: jsPsychVerticalSliderResponse,
+    stimulus: jsPsych.timelineVariable('stimulus'),
+    image_stimuli: jsPsych.timelineVariable('image_stimuli'),
+    require_movement: true
+  };
+
+  /* define test procedure */
+  var test_procedure = {
+    timeline: [test],
+    timeline_variables: test_stimuli
+  };
+  timeline.push(test_procedure);
+  var final_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `<p>You've finished the last task. Thanks for participating!</p>
+    <p>Please manually enter code CKENM4EE on prolific to complete the study. Click any key to exit!</p>`,
+  choices: "NO_KEYS"
+}
+//  timeline.push(final_trial);
+  jsPsych.run(timeline);
+</script>
+
+</html>

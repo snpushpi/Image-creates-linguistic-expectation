@@ -1,0 +1,414 @@
+Sentence,Word,Condition_ID,gpt2_surp,POS,Frequency,Length
+An old man sitting on a bench in a public park.,old,wrong,10.728750228881836,Open,10.34354730540879,3
+An old man sitting on a bench in a public park.,man,wrong,3.514711856842041,Open,11.452463954850357,3
+An old man sitting on a bench in a public park.,sitting,wrong,6.41612434387207,Open,8.479283618343016,7
+An old man sitting on a bench in a public park.,on,wrong,1.9295581579208374,Closed,12.779146043675691,2
+An old man sitting on a bench in a public park.,a,wrong,1.681009292602539,Closed,13.855864282863422,1
+An old man sitting on a bench in a public park.,bench,wrong,1.8306987285614014,Open,6.20050917404269,5
+An old man sitting on a bench in a public park.,in,wrong,2.4917328357696533,Closed,13.119246525062723,2
+An old man sitting on a bench in a public park.,a,wrong,2.777559995651245,Closed,13.855864282863422,1
+An old man sitting on a bench in a public park.,public,wrong,8.192138671875,Open,8.195609567288775,6
+An old man sitting on a bench in a public park.,park.,wrong,6.074724316596985,Open,8.210124405164267,4
+"Two ceramic cups, one with a bird and the other with a fox.",ceramic,wrong,18.131906509399414,Open,4.127134385045092,7
+"Two ceramic cups, one with a bird and the other with a fox.","cups,",wrong,9.679203271865845,Open,5.786897381366708,4
+"Two ceramic cups, one with a bird and the other with a fox.",one,wrong,5.44577169418335,Closed,11.96198631719604,3
+"Two ceramic cups, one with a bird and the other with a fox.",with,wrong,4.165848255157471,Closed,12.458639067517554,4
+"Two ceramic cups, one with a bird and the other with a fox.",a,wrong,1.651254415512085,Closed,13.855864282863422,1
+"Two ceramic cups, one with a bird and the other with a fox.",bird,wrong,12.172406196594238,Open,7.748460023899697,4
+"Two ceramic cups, one with a bird and the other with a fox.",and,wrong,5.884742736816406,Closed,13.433927978319357,3
+"Two ceramic cups, one with a bird and the other with a fox.",the,wrong,2.9354491233825684,Closed,14.22224685776581,3
+"Two ceramic cups, one with a bird and the other with a fox.",other,wrong,0.6305814981460571,Open,10.532229536403737,5
+"Two ceramic cups, one with a bird and the other with a fox.",with,wrong,1.0983471870422363,Closed,12.458639067517554,4
+"Two ceramic cups, one with a bird and the other with a fox.",a,wrong,0.5979921221733093,Closed,13.855864282863422,1
+"Two ceramic cups, one with a bird and the other with a fox.",fox.,wrong,10.61457645893097,Open,7.004881989712859,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",men,wrong,10.453082084655762,Open,9.852773037991627,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",are,wrong,4.5736165046691895,Closed,12.490017744185046,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",posing,wrong,12.612530708312988,Open,5.10594547390058,6
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",for,wrong,1.310906171798706,Closed,12.770391641736165,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",a,wrong,1.3433830738067627,Closed,13.855864282863422,1
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.","photo,",wrong,6.260681629180908,Open,7.060476365999801,5
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",one,wrong,4.858356952667236,Closed,11.96198631719604,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",man,wrong,7.77086877822876,Open,11.452463954850357,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",is,wrong,2.797194480895996,Closed,13.038248891280736,2
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",holding,wrong,2.628021001815796,Open,8.169053149927343,7
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",a,wrong,0.5883784294128418,Closed,13.855864282863422,1
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",slice,wrong,14.360105514526367,Open,6.075346031088684,5
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",of,wrong,0.05504423379898071,Closed,13.288621606997307,2
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",pizza,wrong,1.969918131828308,Open,7.443663683115591,5
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",on,wrong,6.54144287109375,Closed,12.779146043675691,2
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",a,wrong,3.009173631668091,Closed,13.855864282863422,1
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.","plate,",wrong,7.464662551879883,Open,7.176254532017144,5
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",and,wrong,1.286060094833374,Closed,13.433927978319357,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",they,wrong,7.89188289642334,Closed,12.251284988351722,4
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",are,wrong,1.7672699689865112,Closed,12.490017744185046,3
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",surrounded,wrong,7.029737949371338,Open,6.517671272912275,10
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",by,wrong,0.04282979294657707,Closed,11.132601649268397,2
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",other,wrong,5.299508094787598,Open,10.532229536403737,5
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",people,wrong,3.0709264278411865,Open,10.937596874990138,6
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",sitting,wrong,7.2496442794799805,Open,8.479283618343016,7
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",at,wrong,4.357805252075195,Closed,12.00806063485357,2
+"Two men are posing for a photo, one man is holding a slice of pizza on a plate, and they are surrounded by other people sitting at tables.",tables.,wrong,4.312947511672974,Open,6.395261598115449,6
+A toddler is sitting on a blanket outdoors eating an apple.,toddler,wrong,17.63909912109375,Open,3.6888794541139363,7
+A toddler is sitting on a blanket outdoors eating an apple.,is,wrong,4.464824199676514,Closed,13.038248891280736,2
+A toddler is sitting on a blanket outdoors eating an apple.,sitting,wrong,8.295841217041016,Open,8.479283618343016,7
+A toddler is sitting on a blanket outdoors eating an apple.,on,wrong,1.657050609588623,Closed,12.779146043675691,2
+A toddler is sitting on a blanket outdoors eating an apple.,a,wrong,1.3226157426834106,Closed,13.855864282863422,1
+A toddler is sitting on a blanket outdoors eating an apple.,blanket,wrong,5.516982555389404,Open,6.495265555937008,7
+A toddler is sitting on a blanket outdoors eating an apple.,outdoors,wrong,14.632120132446289,Open,4.672828834461906,8
+A toddler is sitting on a blanket outdoors eating an apple.,eating,wrong,11.101591110229492,Open,8.039802343736485,6
+A toddler is sitting on a blanket outdoors eating an apple.,an,wrong,5.503951549530029,Closed,11.462379259863024,2
+A toddler is sitting on a blanket outdoors eating an apple.,apple.,wrong,3.3485735654830933,Open,7.095893221097532,5
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,young,wrong,11.910640716552734,Open,9.425613028909824,5
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,woman,wrong,3.180177688598633,Open,10.006314862335598,5
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,sitting,wrong,6.988450527191162,Open,8.479283618343016,7
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,on,wrong,2.411956548690796,Closed,12.779146043675691,2
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,a,wrong,1.6295207738876343,Closed,13.855864282863422,1
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,curb,wrong,7.280939102172852,Open,5.342334251964811,4
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,next,wrong,3.9896979331970215,Open,10.047154902348542,4
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,to,wrong,0.0036810599267482758,Closed,13.960969286275443,2
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,a,wrong,1.4904855489730835,Closed,13.855864282863422,1
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,fire,wrong,6.761001110076904,Open,9.304741047397666,4
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,hydrant,wrong,1.3733858827472432,Open,3.9512437185814275,7
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,writing,wrong,15.067169189453125,Open,7.955775781534187,7
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,on,wrong,2.594716787338257,Closed,12.779146043675691,2
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,a,wrong,1.6671116352081299,Closed,13.855864282863422,1
+A young woman sitting on a curb next to a fire hydrant writing on a notepad.,notepad.,wrong,16.08593663573265,Open,2.0794415416798357,7
+Two giraffes standing on a dirt expanse with trees in background.,giraffes,wrong,18.836327565601096,Open,3.4339872044851463,8
+Two giraffes standing on a dirt expanse with trees in background.,standing,wrong,11.06072998046875,Open,8.29254851397576,8
+Two giraffes standing on a dirt expanse with trees in background.,on,wrong,2.153743028640747,Closed,12.779146043675691,2
+Two giraffes standing on a dirt expanse with trees in background.,a,wrong,2.575167655944824,Closed,13.855864282863422,1
+Two giraffes standing on a dirt expanse with trees in background.,dirt,wrong,8.624449729919434,Open,7.177782416195197,4
+Two giraffes standing on a dirt expanse with trees in background.,expanse,wrong,13.844631494604982,Open,2.3978952727983707,7
+Two giraffes standing on a dirt expanse with trees in background.,with,wrong,6.7405476570129395,Closed,12.458639067517554,4
+Two giraffes standing on a dirt expanse with trees in background.,trees,wrong,7.904608726501465,Open,7.355641102974253,5
+Two giraffes standing on a dirt expanse with trees in background.,in,wrong,4.082827568054199,Closed,13.119246525062723,2
+Two giraffes standing on a dirt expanse with trees in background.,background.,wrong,12.183732867240906,Open,6.80128303447162,10
+A teddy bear is sitting on the rail of a wire fence.,teddy,wrong,16.30055046081543,Open,6.698268054115413,5
+A teddy bear is sitting on the rail of a wire fence.,bear,wrong,0.05340076982975006,Open,7.982074875081202,4
+A teddy bear is sitting on the rail of a wire fence.,is,wrong,3.3637843132019043,Closed,13.038248891280736,2
+A teddy bear is sitting on the rail of a wire fence.,sitting,wrong,9.233339309692383,Open,8.479283618343016,7
+A teddy bear is sitting on the rail of a wire fence.,on,wrong,1.5595049858093262,Closed,12.779146043675691,2
+A teddy bear is sitting on the rail of a wire fence.,the,wrong,1.636159062385559,Closed,14.22224685776581,3
+A teddy bear is sitting on the rail of a wire fence.,rail,wrong,10.164342880249023,Open,5.4510384535657,4
+A teddy bear is sitting on the rail of a wire fence.,of,wrong,4.648126125335693,Closed,13.288621606997307,2
+A teddy bear is sitting on the rail of a wire fence.,a,wrong,1.5741924047470093,Closed,13.855864282863422,1
+A teddy bear is sitting on the rail of a wire fence.,wire,wrong,14.208173751831055,Open,7.246368080102461,4
+A teddy bear is sitting on the rail of a wire fence.,fence.,wrong,4.0992982387542725,Open,6.70808408385307,5
+A tennis player makes a quick shuffle to return the ball.,tennis,wrong,16.75943374633789,Open,6.543911845564792,6
+A tennis player makes a quick shuffle to return the ball.,player,wrong,2.4198014736175537,Open,7.563200592358071,6
+A tennis player makes a quick shuffle to return the ball.,makes,wrong,9.803890228271484,Open,9.417029285218431,5
+A tennis player makes a quick shuffle to return the ball.,a,wrong,2.1336090564727783,Closed,13.855864282863422,1
+A tennis player makes a quick shuffle to return the ball.,quick,wrong,7.95474100112915,Open,8.620110725422924,5
+A tennis player makes a quick shuffle to return the ball.,shuffle,wrong,12.7444486618042,Open,5.0106352940962555,7
+A tennis player makes a quick shuffle to return the ball.,to,wrong,3.4350709915161133,Closed,13.960969286275443,2
+A tennis player makes a quick shuffle to return the ball.,return,wrong,7.926386833190918,Open,8.450198322591959,6
+A tennis player makes a quick shuffle to return the ball.,the,wrong,3.742788553237915,Closed,14.22224685776581,3
+A tennis player makes a quick shuffle to return the ball.,ball.,wrong,4.163084506988525,Open,8.585412430393381,4
+Plates of food and two glasses of red wine are on a table.,of,wrong,3.2799739837646484,Closed,13.288621606997307,2
+Plates of food and two glasses of red wine are on a table.,food,wrong,12.164380073547363,Open,8.971575439759016,4
+Plates of food and two glasses of red wine are on a table.,and,wrong,3.4714908599853516,Closed,13.433927978319357,3
+Plates of food and two glasses of red wine are on a table.,two,wrong,12.404013633728027,Closed,10.903825271935897,3
+Plates of food and two glasses of red wine are on a table.,glasses,wrong,8.653375625610352,Open,7.4318919168078,7
+Plates of food and two glasses of red wine are on a table.,of,wrong,0.10725188255310059,Closed,13.288621606997307,2
+Plates of food and two glasses of red wine are on a table.,red,wrong,8.607518196105957,Open,8.929435283803425,3
+Plates of food and two glasses of red wine are on a table.,wine,wrong,0.08118271082639694,Open,8.032035314398824,4
+Plates of food and two glasses of red wine are on a table.,are,wrong,4.285057067871094,Closed,12.490017744185046,3
+Plates of food and two glasses of red wine are on a table.,on,wrong,5.372228622436523,Closed,12.779146043675691,2
+Plates of food and two glasses of red wine are on a table.,a,wrong,4.232431888580322,Closed,13.855864282863422,1
+Plates of food and two glasses of red wine are on a table.,table.,wrong,4.569024324417114,Open,8.591743922680534,5
+"An empty clean kitchen with cabinetry, stove and dishwasher.",empty,wrong,14.329768180847168,Open,7.786967002614872,5
+"An empty clean kitchen with cabinetry, stove and dishwasher.",clean,wrong,14.272537231445312,Open,8.729558869558568,5
+"An empty clean kitchen with cabinetry, stove and dishwasher.",kitchen,wrong,9.767260551452637,Open,7.9976631270201,7
+"An empty clean kitchen with cabinetry, stove and dishwasher.",with,wrong,3.562371253967285,Closed,12.458639067517554,4
+"An empty clean kitchen with cabinetry, stove and dishwasher.","cabinetry,",wrong,18.023844301700592,Open,0.0,9
+"An empty clean kitchen with cabinetry, stove and dishwasher.",stove,wrong,7.157403469085693,Open,5.958424693029782,5
+"An empty clean kitchen with cabinetry, stove and dishwasher.",and,wrong,1.8314485549926758,Closed,13.433927978319357,3
+"An empty clean kitchen with cabinetry, stove and dishwasher.",dishwasher.,wrong,7.410223305225372,Open,4.634728988229636,10
+A man holding a baby while standing in front of a mirror.,man,wrong,10.534785270690918,Open,11.452463954850357,3
+A man holding a baby while standing in front of a mirror.,holding,wrong,8.092991828918457,Open,8.169053149927343,7
+A man holding a baby while standing in front of a mirror.,a,wrong,0.5111320614814758,Closed,13.855864282863422,1
+A man holding a baby while standing in front of a mirror.,baby,wrong,4.429136276245117,Open,10.165005304967229,4
+A man holding a baby while standing in front of a mirror.,while,wrong,5.697741985321045,Closed,9.7881328161731,5
+A man holding a baby while standing in front of a mirror.,standing,wrong,7.912637710571289,Open,8.29254851397576,8
+A man holding a baby while standing in front of a mirror.,in,wrong,2.1734728813171387,Closed,13.119246525062723,2
+A man holding a baby while standing in front of a mirror.,front,wrong,1.6123439073562622,Open,9.133351330448047,5
+A man holding a baby while standing in front of a mirror.,of,wrong,0.004083618521690369,Closed,13.288621606997307,2
+A man holding a baby while standing in front of a mirror.,a,wrong,0.9001075029373169,Closed,13.855864282863422,1
+A man holding a baby while standing in front of a mirror.,mirror.,wrong,11.217355012893677,Open,7.117205503164344,6
+A cat sitting on the hood of a parked black car in a garage.,cat,wrong,14.127521514892578,Open,8.12651816878071,3
+A cat sitting on the hood of a parked black car in a garage.,sitting,wrong,10.479620933532715,Open,8.479283618343016,7
+A cat sitting on the hood of a parked black car in a garage.,on,wrong,1.5355076789855957,Closed,12.779146043675691,2
+A cat sitting on the hood of a parked black car in a garage.,the,wrong,1.7545573711395264,Closed,14.22224685776581,3
+A cat sitting on the hood of a parked black car in a garage.,hood,wrong,9.349183082580566,Open,6.665683717782408,4
+A cat sitting on the hood of a parked black car in a garage.,of,wrong,0.4477085471153259,Closed,13.288621606997307,2
+A cat sitting on the hood of a parked black car in a garage.,a,wrong,1.215875506401062,Closed,13.855864282863422,1
+A cat sitting on the hood of a parked black car in a garage.,parked,wrong,6.0003790855407715,Open,6.278521424165844,6
+A cat sitting on the hood of a parked black car in a garage.,black,wrong,10.220887184143066,Open,9.05543941075822,5
+A cat sitting on the hood of a parked black car in a garage.,car,wrong,3.619708776473999,Open,10.111964066806934,3
+A cat sitting on the hood of a parked black car in a garage.,in,wrong,3.5881214141845703,Closed,13.119246525062723,2
+A cat sitting on the hood of a parked black car in a garage.,a,wrong,3.6954872608184814,Closed,13.855864282863422,1
+A cat sitting on the hood of a parked black car in a garage.,garage.,wrong,12.512696743011475,Open,7.23561914106675,6
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,batter,correct,17.12637710571289,Open,5.313205979041787,6
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,swinging,correct,12.75515079498291,Open,5.746203190540153,8
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,a,correct,2.8864667415618896,Closed,13.855864282863422,1
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,bat,correct,1.6607778072357178,Open,6.9584483932976555,3
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,at,correct,2.296419858932495,Closed,12.00806063485357,2
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,a,correct,2.4244470596313477,Closed,13.855864282863422,1
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,baseball,correct,4.8210625648498535,Open,7.160845906664299,8
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,with,correct,7.1127705574035645,Closed,12.458639067517554,4
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,the,correct,2.7412405014038086,Closed,14.22224685776581,3
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,catcher,correct,9.423480987548828,Open,5.25227342804663,7
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,and,correct,5.983933448791504,Closed,13.433927978319357,3
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,umpire,correct,8.366981480270624,Open,3.9889840465642745,6
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,behind,correct,9.346502304077148,Closed,9.167537249650874,6
+A batter swinging a bat at a baseball with the catcher and umpire behind him.,him.,correct,2.7068475484848022,Closed,12.087908287179532,3
+A refrigerator mostly empty with only a few bottles of water inside.,refrigerator,correct,17.70765495300293,Open,6.056784013228625,12
+A refrigerator mostly empty with only a few bottles of water inside.,mostly,correct,17.033870697021484,Open,7.1929342212158,6
+A refrigerator mostly empty with only a few bottles of water inside.,empty,correct,6.799161911010742,Open,7.786967002614872,5
+A refrigerator mostly empty with only a few bottles of water inside.,with,correct,5.381125450134277,Closed,12.458639067517554,4
+A refrigerator mostly empty with only a few bottles of water inside.,only,correct,4.681709289550781,Open,10.919967451665618,4
+A refrigerator mostly empty with only a few bottles of water inside.,a,correct,1.812915563583374,Closed,13.855864282863422,1
+A refrigerator mostly empty with only a few bottles of water inside.,few,correct,1.2376840114593506,Open,9.641668139610074,3
+A refrigerator mostly empty with only a few bottles of water inside.,bottles,correct,4.316959381103516,Open,6.525029657843462,7
+A refrigerator mostly empty with only a few bottles of water inside.,of,correct,0.9117127656936646,Closed,13.288621606997307,2
+A refrigerator mostly empty with only a few bottles of water inside.,water,correct,2.732454776763916,Open,9.348187438668308,5
+A refrigerator mostly empty with only a few bottles of water inside.,inside.,correct,7.569753587245941,Open,9.28498391497195,6
+A heavily lit-up building in front of a river.,heavily,correct,14.524154663085938,Open,5.7430031878094825,7
+A heavily lit-up building in front of a river.,lit-up,correct,17.123619556427002,Open,0.0,5
+A heavily lit-up building in front of a river.,building,correct,3.843471050262451,Open,8.532672762264625,8
+A heavily lit-up building in front of a river.,in,correct,3.4723541736602783,Closed,13.119246525062723,2
+A heavily lit-up building in front of a river.,front,correct,6.0386247634887695,Open,9.133351330448047,5
+A heavily lit-up building in front of a river.,of,correct,0.05013694241642952,Closed,13.288621606997307,2
+A heavily lit-up building in front of a river.,a,correct,3.0850977897644043,Closed,13.855864282863422,1
+A heavily lit-up building in front of a river.,river.,correct,13.314834117889404,Open,7.947678571301568,5
+A city skyline is shown with a subway train coming around the bend.,city,correct,11.932082176208496,Open,9.06230429314878,4
+A city skyline is shown with a subway train coming around the bend.,skyline,correct,12.304572105407715,Open,3.5263605246161616,7
+A city skyline is shown with a subway train coming around the bend.,is,correct,3.1588635444641113,Closed,13.038248891280736,2
+A city skyline is shown with a subway train coming around the bend.,shown,correct,7.53826379776001,Open,6.583409222158765,5
+A city skyline is shown with a subway train coming around the bend.,with,correct,5.47551155090332,Closed,12.458639067517554,4
+A city skyline is shown with a subway train coming around the bend.,a,correct,2.532850742340088,Closed,13.855864282863422,1
+A city skyline is shown with a subway train coming around the bend.,subway,correct,9.335725784301758,Open,6.302618975744905,6
+A city skyline is shown with a subway train coming around the bend.,train,correct,4.498278617858887,Open,8.48632152774915,5
+A city skyline is shown with a subway train coming around the bend.,coming,correct,6.941298961639404,Open,10.19906338710701,6
+A city skyline is shown with a subway train coming around the bend.,around,correct,10.564677238464355,Closed,10.534040986325001,6
+A city skyline is shown with a subway train coming around the bend.,the,correct,1.320106029510498,Closed,14.22224685776581,3
+A city skyline is shown with a subway train coming around the bend.,bend.,correct,10.348735570907593,Open,6.643789733147672,4
+A stop sign located at the intersection of East Village and Woodfield Rd.,stop,correct,13.237504959106445,Open,10.493244497383538,4
+A stop sign located at the intersection of East Village and Woodfield Rd.,sign,correct,5.043303966522217,Open,8.824236617346639,4
+A stop sign located at the intersection of East Village and Woodfield Rd.,located,correct,11.368833541870117,Open,6.148468295917647,7
+A stop sign located at the intersection of East Village and Woodfield Rd.,at,correct,1.8273271322250366,Closed,12.00806063485357,2
+A stop sign located at the intersection of East Village and Woodfield Rd.,the,correct,1.200533151626587,Closed,14.22224685776581,3
+A stop sign located at the intersection of East Village and Woodfield Rd.,intersection,correct,3.2946369647979736,Open,4.7535901911063645,12
+A stop sign located at the intersection of East Village and Woodfield Rd.,of,correct,0.19136682152748108,Closed,13.288621606997307,2
+A stop sign located at the intersection of East Village and Woodfield Rd.,East,correct,5.97627067565918,Open,7.834788107388194,4
+A stop sign located at the intersection of East Village and Woodfield Rd.,Village,correct,9.623831748962402,Open,7.445417556701687,7
+A stop sign located at the intersection of East Village and Woodfield Rd.,and,correct,1.199759602546692,Closed,13.433927978319357,3
+A stop sign located at the intersection of East Village and Woodfield Rd.,Woodfield,correct,16.704416275024414,Open,0.0,9
+A stop sign located at the intersection of East Village and Woodfield Rd.,Rd.,correct,9.011587858200073,Open,6.342121418721152,2
+A tray topped with a chicken sandwich next to a cup of fries.,tray,correct,17.196176528930664,Open,6.016157159698354,4
+A tray topped with a chicken sandwich next to a cup of fries.,topped,correct,12.930815696716309,Open,3.871201010907891,6
+A tray topped with a chicken sandwich next to a cup of fries.,with,correct,0.1430407613515854,Closed,12.458639067517554,4
+A tray topped with a chicken sandwich next to a cup of fries.,a,correct,1.821361780166626,Closed,13.855864282863422,1
+A tray topped with a chicken sandwich next to a cup of fries.,chicken,correct,9.579057693481445,Open,8.054522609537294,7
+A tray topped with a chicken sandwich next to a cup of fries.,sandwich,correct,6.6297926902771,Open,7.0192966537150445,8
+A tray topped with a chicken sandwich next to a cup of fries.,next,correct,11.447662353515625,Open,10.047154902348542,4
+A tray topped with a chicken sandwich next to a cup of fries.,to,correct,0.04372921586036682,Closed,13.960969286275443,2
+A tray topped with a chicken sandwich next to a cup of fries.,a,correct,1.4267021417617798,Closed,13.855864282863422,1
+A tray topped with a chicken sandwich next to a cup of fries.,cup,correct,7.046217441558838,Open,7.876258882303226,3
+A tray topped with a chicken sandwich next to a cup of fries.,of,correct,0.27166518568992615,Closed,13.288621606997307,2
+A tray topped with a chicken sandwich next to a cup of fries.,fries.,correct,10.732824325561523,Open,6.39024066706535,5
+A baby elephant walking through a shallow pool of flowing water.,baby,correct,13.874159812927246,Open,10.165005304967229,4
+A baby elephant walking through a shallow pool of flowing water.,elephant,correct,7.848835468292236,Open,6.363028103540465,8
+A baby elephant walking through a shallow pool of flowing water.,walking,correct,11.363457679748535,Open,8.249575150000199,7
+A baby elephant walking through a shallow pool of flowing water.,through,correct,3.737987756729126,Closed,10.240887929730164,7
+A baby elephant walking through a shallow pool of flowing water.,a,correct,1.9414697885513306,Closed,13.855864282863422,1
+A baby elephant walking through a shallow pool of flowing water.,shallow,correct,12.487688064575195,Open,5.707110264748875,7
+A baby elephant walking through a shallow pool of flowing water.,pool,correct,5.522574424743652,Open,7.78155595923534,4
+A baby elephant walking through a shallow pool of flowing water.,of,correct,3.3518126010894775,Closed,13.288621606997307,2
+A baby elephant walking through a shallow pool of flowing water.,flowing,correct,12.393982887268066,Open,5.37989735354046,7
+A baby elephant walking through a shallow pool of flowing water.,water.,correct,2.2309021055698395,Open,9.348187438668308,5
+Several containers of food and beverages on a wooden table outdoors.,containers,correct,15.415008544921875,Open,4.343805421853684,10
+Several containers of food and beverages on a wooden table outdoors.,of,correct,2.317218542098999,Closed,13.288621606997307,2
+Several containers of food and beverages on a wooden table outdoors.,food,correct,4.952383995056152,Open,8.971575439759016,4
+Several containers of food and beverages on a wooden table outdoors.,and,correct,2.9169561862945557,Closed,13.433927978319357,3
+Several containers of food and beverages on a wooden table outdoors.,beverages,correct,3.7034804821014404,Open,4.110873864173311,9
+Several containers of food and beverages on a wooden table outdoors.,on,correct,7.135237693786621,Closed,12.779146043675691,2
+Several containers of food and beverages on a wooden table outdoors.,a,correct,3.513672351837158,Closed,13.855864282863422,1
+Several containers of food and beverages on a wooden table outdoors.,wooden,correct,8.083211898803711,Open,5.905361848054571,6
+Several containers of food and beverages on a wooden table outdoors.,table,correct,3.240508794784546,Open,8.591743922680534,5
+Several containers of food and beverages on a wooden table outdoors.,outdoors.,correct,18.57394576072693,Open,4.672828834461906,8
+Some control buttons on an orange and silver electronic device.,control,correct,11.743976593017578,Open,8.804175018753625,7
+Some control buttons on an orange and silver electronic device.,buttons,correct,11.08700942993164,Open,6.095824562432225,7
+Some control buttons on an orange and silver electronic device.,on,correct,3.656151056289673,Closed,12.779146043675691,2
+Some control buttons on an orange and silver electronic device.,an,correct,7.34004020690918,Closed,11.462379259863024,2
+Some control buttons on an orange and silver electronic device.,orange,correct,10.760388374328613,Open,7.037027614686276,6
+Some control buttons on an orange and silver electronic device.,and,correct,5.108624458312988,Closed,13.433927978319357,3
+Some control buttons on an orange and silver electronic device.,silver,correct,5.837494373321533,Open,7.389563953677635,6
+Some control buttons on an orange and silver electronic device.,electronic,correct,14.539569854736328,Open,5.857933154483459,10
+Some control buttons on an orange and silver electronic device.,device.,correct,6.225126266479492,Open,6.8308742346461795,6
+A bird sits atop a wooden post and watches its surroundings.,bird,correct,15.260147094726562,Open,7.748460023899697,4
+A bird sits atop a wooden post and watches its surroundings.,sits,correct,12.567977905273438,Open,6.230481447578482,4
+A bird sits atop a wooden post and watches its surroundings.,atop,correct,5.3537726402282715,Closed,3.9512437185814275,4
+A bird sits atop a wooden post and watches its surroundings.,a,correct,0.7762394547462463,Closed,13.855864282863422,1
+A bird sits atop a wooden post and watches its surroundings.,wooden,correct,8.435827255249023,Open,5.905361848054571,6
+A bird sits atop a wooden post and watches its surroundings.,post,correct,7.601016998291016,Open,7.4109518755836366,4
+A bird sits atop a wooden post and watches its surroundings.,and,correct,4.685833930969238,Closed,13.433927978319357,3
+A bird sits atop a wooden post and watches its surroundings.,watches,correct,6.707004070281982,Open,6.0063531596017325,7
+A bird sits atop a wooden post and watches its surroundings.,its,correct,4.652915000915527,Closed,9.077608659522225,3
+A bird sits atop a wooden post and watches its surroundings.,surroundings.,correct,6.728465557098389,Open,4.672828834461906,12
+A person holding an object in front of a panda bear.,person,correct,11.074508666992188,Open,9.292565312231853,6
+A person holding an object in front of a panda bear.,holding,correct,8.48698616027832,Open,8.169053149927343,7
+A person holding an object in front of a panda bear.,an,correct,3.8659491539001465,Closed,11.462379259863024,2
+A person holding an object in front of a panda bear.,object,correct,5.583012104034424,Open,7.1808311990445555,6
+A person holding an object in front of a panda bear.,in,correct,3.4502248764038086,Closed,13.119246525062723,2
+A person holding an object in front of a panda bear.,front,correct,5.67016077041626,Open,9.133351330448047,5
+A person holding an object in front of a panda bear.,of,correct,0.022769253700971603,Closed,13.288621606997307,2
+A person holding an object in front of a panda bear.,a,correct,1.9488369226455688,Closed,13.855864282863422,1
+A person holding an object in front of a panda bear.,panda,correct,17.546923637390137,Open,4.68213122712422,5
+A person holding an object in front of a panda bear.,bear.,correct,10.017078876495361,Open,7.982074875081202,4
+People are on the beach flying kites that look like arches in the sky.,are,correct,5.7651519775390625,Closed,12.490017744185046,3
+People are on the beach flying kites that look like arches in the sky.,on,correct,8.158062934875488,Closed,12.779146043675691,2
+People are on the beach flying kites that look like arches in the sky.,the,correct,1.644884705543518,Closed,14.22224685776581,3
+People are on the beach flying kites that look like arches in the sky.,beach,correct,10.115350723266602,Open,7.968319500012717,5
+People are on the beach flying kites that look like arches in the sky.,flying,correct,13.98183822631836,Open,7.8551570058813445,6
+People are on the beach flying kites that look like arches in the sky.,kites,correct,8.486294090747833,Open,3.58351893845611,5
+People are on the beach flying kites that look like arches in the sky.,that,correct,6.071568012237549,Closed,13.486557779225057,4
+People are on the beach flying kites that look like arches in the sky.,look,correct,4.056403636932373,Open,11.506011619326115,4
+People are on the beach flying kites that look like arches in the sky.,like,correct,0.18950775265693665,Closed,12.2256154351499,4
+People are on the beach flying kites that look like arches in the sky.,arches,correct,18.147439002990723,Open,3.7612001156935624,6
+People are on the beach flying kites that look like arches in the sky.,in,correct,4.980739593505859,Closed,13.119246525062723,2
+People are on the beach flying kites that look like arches in the sky.,the,correct,0.8542649745941162,Closed,14.22224685776581,3
+People are on the beach flying kites that look like arches in the sky.,sky.,correct,3.9901376962661743,Open,7.734121303328305,3
+A huge dragon kite flown with a steeple in the background.,huge,no,12.559771537780762,Open,7.810758116529357,4
+A huge dragon kite flown with a steeple in the background.,dragon,no,13.703088760375977,Open,6.891625897052253,6
+A huge dragon kite flown with a steeple in the background.,kite,no,14.342725038528442,Open,4.762173934797756,4
+A huge dragon kite flown with a steeple in the background.,flown,no,13.681419372558594,Open,5.44673737166631,5
+A huge dragon kite flown with a steeple in the background.,with,no,6.917911529541016,Closed,12.458639067517554,4
+A huge dragon kite flown with a steeple in the background.,a,no,2.1274962425231934,Closed,13.855864282863422,1
+A huge dragon kite flown with a steeple in the background.,steeple,no,16.598206758499146,Open,3.044522437723423,7
+A huge dragon kite flown with a steeple in the background.,in,no,5.565031051635742,Closed,13.119246525062723,2
+A huge dragon kite flown with a steeple in the background.,the,no,1.8309991359710693,Closed,14.22224685776581,3
+A huge dragon kite flown with a steeple in the background.,background.,no,7.401467204093933,Open,6.80128303447162,10
+The bench is in a shady area surrounded by plants.,bench,no,14.374364852905273,Open,6.20050917404269,5
+The bench is in a shady area surrounded by plants.,is,no,4.1080522537231445,Closed,13.038248891280736,2
+The bench is in a shady area surrounded by plants.,in,no,5.803989410400391,Closed,13.119246525062723,2
+The bench is in a shady area surrounded by plants.,a,no,3.767103910446167,Closed,13.855864282863422,1
+The bench is in a shady area surrounded by plants.,shady,no,14.15152645111084,Open,4.787491742782046,5
+The bench is in a shady area surrounded by plants.,area,no,3.144590377807617,Open,8.2482674474469,4
+The bench is in a shady area surrounded by plants.,surrounded,no,7.268951416015625,Open,6.517671272912275,10
+The bench is in a shady area surrounded by plants.,by,no,0.012704664841294289,Closed,11.132601649268397,2
+The bench is in a shady area surrounded by plants.,plants.,no,12.647334456443787,Open,6.1903154058531475,6
+"A dried black flower in a long, tall black and white vase.",dried,no,17.114274978637695,Open,5.552959584921617,5
+"A dried black flower in a long, tall black and white vase.",black,no,9.465592384338379,Open,9.05543941075822,5
+"A dried black flower in a long, tall black and white vase.",flower,no,8.849466323852539,Open,7.057036981697891,6
+"A dried black flower in a long, tall black and white vase.",in,no,5.231893539428711,Closed,13.119246525062723,2
+"A dried black flower in a long, tall black and white vase.",a,no,2.3695740699768066,Closed,13.855864282863422,1
+"A dried black flower in a long, tall black and white vase.","long,",no,11.945540428161621,Open,10.446770685850653,4
+"A dried black flower in a long, tall black and white vase.",tall,no,8.507087707519531,Open,7.407924322559599,4
+"A dried black flower in a long, tall black and white vase.",black,no,6.693179607391357,Open,9.05543941075822,5
+"A dried black flower in a long, tall black and white vase.",and,no,7.454022407531738,Closed,13.433927978319357,3
+"A dried black flower in a long, tall black and white vase.",white,no,1.4467737674713135,Open,9.076123029856374,5
+"A dried black flower in a long, tall black and white vase.",vase.,no,12.365706324577332,Open,5.278114659230517,4
+A man walking with an umbrella near a railing above a river.,man,no,10.534785270690918,Open,11.452463954850357,3
+A man walking with an umbrella near a railing above a river.,walking,no,7.991266250610352,Open,8.249575150000199,7
+A man walking with an umbrella near a railing above a river.,with,no,3.8699731826782227,Closed,12.458639067517554,4
+A man walking with an umbrella near a railing above a river.,an,no,5.874357223510742,Closed,11.462379259863024,2
+A man walking with an umbrella near a railing above a river.,umbrella,no,5.435713768005371,Open,5.945420608606575,8
+A man walking with an umbrella near a railing above a river.,near,no,5.186366558074951,Closed,8.351846738828245,4
+A man walking with an umbrella near a railing above a river.,a,no,2.8189399242401123,Closed,13.855864282863422,1
+A man walking with an umbrella near a railing above a river.,railing,no,15.36478042602539,Open,4.31748811353631,7
+A man walking with an umbrella near a railing above a river.,above,no,9.182199478149414,Closed,7.821242083523558,5
+A man walking with an umbrella near a railing above a river.,a,no,1.8622335195541382,Closed,13.855864282863422,1
+A man walking with an umbrella near a railing above a river.,river.,no,12.08903169631958,Open,7.947678571301568,5
+A giraffe standing in front of a grassy plain and blue sky.,giraffe,no,17.113699309527874,Open,4.330733340286331,7
+A giraffe standing in front of a grassy plain and blue sky.,standing,no,10.416190147399902,Open,8.29254851397576,8
+A giraffe standing in front of a grassy plain and blue sky.,in,no,2.2294139862060547,Closed,13.119246525062723,2
+A giraffe standing in front of a grassy plain and blue sky.,front,no,1.378888487815857,Open,9.133351330448047,5
+A giraffe standing in front of a grassy plain and blue sky.,of,no,0.043479423969984055,Closed,13.288621606997307,2
+A giraffe standing in front of a grassy plain and blue sky.,a,no,1.32358980178833,Closed,13.855864282863422,1
+A giraffe standing in front of a grassy plain and blue sky.,grassy,no,12.715641856193542,Open,3.4657359027997265,6
+A giraffe standing in front of a grassy plain and blue sky.,plain,no,6.30754280090332,Open,7.014814351275545,5
+A giraffe standing in front of a grassy plain and blue sky.,and,no,6.705892562866211,Closed,13.433927978319357,3
+A giraffe standing in front of a grassy plain and blue sky.,blue,no,9.826180458068848,Open,8.560635749259074,4
+A giraffe standing in front of a grassy plain and blue sky.,sky.,no,3.792468547821045,Open,7.734121303328305,3
+People watch from a large boat as a smaller boat is lowered into the ocean.,watch,no,13.169837951660156,Open,9.730977703126166,5
+People watch from a large boat as a smaller boat is lowered into the ocean.,from,no,6.089775085449219,Closed,11.552069252087856,4
+People watch from a large boat as a smaller boat is lowered into the ocean.,a,no,3.1183371543884277,Closed,13.855864282863422,1
+People watch from a large boat as a smaller boat is lowered into the ocean.,large,no,7.840183258056641,Open,7.656337166430183,5
+People watch from a large boat as a smaller boat is lowered into the ocean.,boat,no,10.788233757019043,Open,8.493924564476883,4
+People watch from a large boat as a smaller boat is lowered into the ocean.,as,no,3.4039859771728516,Closed,11.635744686615075,2
+People watch from a large boat as a smaller boat is lowered into the ocean.,a,no,3.1640899181365967,Closed,13.855864282863422,1
+People watch from a large boat as a smaller boat is lowered into the ocean.,smaller,no,10.959476470947266,Open,6.522092798170152,7
+People watch from a large boat as a smaller boat is lowered into the ocean.,boat,no,1.3118208646774292,Open,8.493924564476883,4
+People watch from a large boat as a smaller boat is lowered into the ocean.,is,no,4.3126044273376465,Closed,13.038248891280736,2
+People watch from a large boat as a smaller boat is lowered into the ocean.,lowered,no,5.543202877044678,Open,4.532599493153256,7
+People watch from a large boat as a smaller boat is lowered into the ocean.,into,no,2.070680856704712,Closed,10.670674845804538,4
+People watch from a large boat as a smaller boat is lowered into the ocean.,the,no,0.41104257106781006,Closed,14.22224685776581,3
+People watch from a large boat as a smaller boat is lowered into the ocean.,ocean.,no,6.795848369598389,Open,7.3427791893318455,5
+A girl in an orange sweater is sitting on a skateboard.,girl,no,13.129934310913086,Open,10.254602065894211,4
+A girl in an orange sweater is sitting on a skateboard.,in,no,3.8099026679992676,Closed,13.119246525062723,2
+A girl in an orange sweater is sitting on a skateboard.,an,no,5.749943733215332,Closed,11.462379259863024,2
+A girl in an orange sweater is sitting on a skateboard.,orange,no,4.198968410491943,Open,7.037027614686276,6
+A girl in an orange sweater is sitting on a skateboard.,sweater,no,6.740407943725586,Open,6.556778356158042,7
+A girl in an orange sweater is sitting on a skateboard.,is,no,5.470102787017822,Closed,13.038248891280736,2
+A girl in an orange sweater is sitting on a skateboard.,sitting,no,6.0330071449279785,Open,8.479283618343016,7
+A girl in an orange sweater is sitting on a skateboard.,on,no,1.428990364074707,Closed,12.779146043675691,2
+A girl in an orange sweater is sitting on a skateboard.,a,no,1.1155073642730713,Closed,13.855864282863422,1
+A girl in an orange sweater is sitting on a skateboard.,skateboard.,no,13.865216039121151,Open,4.442651256490317,10
+A woman in a white shirt standing in front of a fence smiling.,woman,no,11.927244186401367,Open,10.006314862335598,5
+A woman in a white shirt standing in front of a fence smiling.,in,no,3.7299957275390625,Closed,13.119246525062723,2
+A woman in a white shirt standing in front of a fence smiling.,a,no,2.8373920917510986,Closed,13.855864282863422,1
+A woman in a white shirt standing in front of a fence smiling.,white,no,3.5748345851898193,Open,9.076123029856374,5
+A woman in a white shirt standing in front of a fence smiling.,shirt,no,3.6997103691101074,Open,7.768533300926033,5
+A woman in a white shirt standing in front of a fence smiling.,standing,no,9.15665054321289,Open,8.29254851397576,8
+A woman in a white shirt standing in front of a fence smiling.,in,no,2.3179526329040527,Closed,13.119246525062723,2
+A woman in a white shirt standing in front of a fence smiling.,front,no,0.639683187007904,Open,9.133351330448047,5
+A woman in a white shirt standing in front of a fence smiling.,of,no,0.006757171358913183,Closed,13.288621606997307,2
+A woman in a white shirt standing in front of a fence smiling.,a,no,1.2383848428726196,Closed,13.855864282863422,1
+A woman in a white shirt standing in front of a fence smiling.,fence,no,7.744856357574463,Open,6.70808408385307,5
+A woman in a white shirt standing in front of a fence smiling.,smiling.,no,18.65154004096985,Open,6.776506992372183,7
+A group of elephants being cleaned by their handlers in a river.,group,no,10.322407722473145,Open,8.232706009860976,5
+A group of elephants being cleaned by their handlers in a river.,of,no,0.4675622582435608,Closed,13.288621606997307,2
+A group of elephants being cleaned by their handlers in a river.,elephants,no,13.196086883544922,Open,5.407171771460119,9
+A group of elephants being cleaned by their handlers in a river.,being,no,9.997790336608887,Closed,10.117832509493988,5
+A group of elephants being cleaned by their handlers in a river.,cleaned,no,10.008208274841309,Open,6.810142450115136,7
+A group of elephants being cleaned by their handlers in a river.,by,no,3.9699440002441406,Closed,11.132601649268397,2
+A group of elephants being cleaned by their handlers in a river.,their,no,6.252115726470947,Closed,10.416700324794617,5
+A group of elephants being cleaned by their handlers in a river.,handlers,no,4.280271530151367,Open,3.58351893845611,8
+A group of elephants being cleaned by their handlers in a river.,in,no,3.1193318367004395,Closed,13.119246525062723,2
+A group of elephants being cleaned by their handlers in a river.,a,no,3.848663091659546,Closed,13.855864282863422,1
+A group of elephants being cleaned by their handlers in a river.,river.,no,11.918288707733154,Open,7.947678571301568,5
+An outdoor market has a wide variety of fruit to choose from.,outdoor,no,15.582263946533203,Open,4.532599493153256,7
+An outdoor market has a wide variety of fruit to choose from.,market,no,7.733590126037598,Open,7.521859252201629,6
+An outdoor market has a wide variety of fruit to choose from.,has,no,5.183788299560547,Closed,10.965262951152264,3
+An outdoor market has a wide variety of fruit to choose from.,a,no,4.6550517082214355,Closed,13.855864282863422,1
+An outdoor market has a wide variety of fruit to choose from.,wide,no,6.326297760009766,Open,7.101675971619444,4
+An outdoor market has a wide variety of fruit to choose from.,variety,no,1.6971098184585571,Open,5.683579767338681,7
+An outdoor market has a wide variety of fruit to choose from.,of,no,0.042125750333070755,Closed,13.288621606997307,2
+An outdoor market has a wide variety of fruit to choose from.,fruit,no,9.443363189697266,Open,7.010311867307229,5
+An outdoor market has a wide variety of fruit to choose from.,to,no,6.522724151611328,Closed,13.960969286275443,2
+An outdoor market has a wide variety of fruit to choose from.,choose,no,0.2144218385219574,Open,7.804251383528112,6
+An outdoor market has a wide variety of fruit to choose from.,from.,no,2.3824085076339543,Closed,11.552069252087856,4
+A woman and man sit under a large blue umbrella on a grassy lot.,woman,no,11.927244186401367,Open,10.006314862335598,5
+A woman and man sit under a large blue umbrella on a grassy lot.,and,no,5.446707248687744,Closed,13.433927978319357,3
+A woman and man sit under a large blue umbrella on a grassy lot.,man,no,6.44879150390625,Open,11.452463954850357,3
+A woman and man sit under a large blue umbrella on a grassy lot.,sit,no,6.997950077056885,Open,9.672752760526098,3
+A woman and man sit under a large blue umbrella on a grassy lot.,under,no,8.647875785827637,Closed,9.499870735285581,5
+A woman and man sit under a large blue umbrella on a grassy lot.,a,no,0.7065486311912537,Closed,13.855864282863422,1
+A woman and man sit under a large blue umbrella on a grassy lot.,large,no,6.050237655639648,Open,7.656337166430183,5
+A woman and man sit under a large blue umbrella on a grassy lot.,blue,no,7.077259540557861,Open,8.560635749259074,4
+A woman and man sit under a large blue umbrella on a grassy lot.,umbrella,no,5.415394306182861,Open,5.945420608606575,8
+A woman and man sit under a large blue umbrella on a grassy lot.,on,no,4.1484293937683105,Closed,12.779146043675691,2
+A woman and man sit under a large blue umbrella on a grassy lot.,a,no,1.7202409505844116,Closed,13.855864282863422,1
+A woman and man sit under a large blue umbrella on a grassy lot.,grassy,no,5.45585797727108,Open,3.4657359027997265,6
+A woman and man sit under a large blue umbrella on a grassy lot.,lot.,no,7.959757089614868,Open,10.277324385186116,3
+A vandalized stop sign in the dark with a sky background.,vandalized,no,22.09300422668457,Open,2.9444389791664403,10
+A vandalized stop sign in the dark with a sky background.,stop,no,13.92386245727539,Open,10.493244497383538,4
+A vandalized stop sign in the dark with a sky background.,sign,no,0.11195564270019531,Open,8.824236617346639,4
+A vandalized stop sign in the dark with a sky background.,in,no,2.7509589195251465,Closed,13.119246525062723,2
+A vandalized stop sign in the dark with a sky background.,the,no,4.224551677703857,Closed,14.22224685776581,3
+A vandalized stop sign in the dark with a sky background.,dark,no,10.950840950012207,Open,8.41604600941128,4
+A vandalized stop sign in the dark with a sky background.,with,no,5.913149356842041,Closed,12.458639067517554,4
+A vandalized stop sign in the dark with a sky background.,a,no,1.5562820434570312,Closed,13.855864282863422,1
+A vandalized stop sign in the dark with a sky background.,sky,no,13.468401908874512,Open,7.734121303328305,3
+A vandalized stop sign in the dark with a sky background.,background.,no,11.731033444404602,Open,6.80128303447162,10
