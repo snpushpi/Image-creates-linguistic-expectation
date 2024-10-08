@@ -1,22 +1,20 @@
 # Description of datasets and analysis code
 
-- final_v2_all_with_error_info.csv - it has all the data, error information in each word level from all particpants along with length, frequency, surprisal, groundedness, POS etc, so in the "correctness" column, you would see 3 categories - "correct","wrong" and "unavaiable". It means for each word in the sentence, the column indicates if the participant got it right or wrong or made a mistake in a previous word hence the data for that word is unavailable. You would see also both First_RT and RT in the dataset. First_RT  collected RT for all correct and the only wrong word in a sentence if applicable, RT only collected reaction time correct words, so if correctness=="wrong" you would find the corresponding RT to be None. if correctness=="unavailable", both First_RT and RT will be None
+This repository contains the relevant codes and datasets for the publication [**Image-conditioned human language comprehension and psychometric benchmarking of visual language models**]()(*In Proceedings of the 28th Conference on Computational Natural Language Learning (CoNLL 2024)*) and the thesis [**Expectation-based comprehension of linguistic input: facilitation from visual context**](https://scholar.google.com/citations?view_op=view_citation&hl=en&user=VpwZ4RIAAAAJ&citation_for_view=VpwZ4RIAAAAJ:W7OEmFMy1HYC)
 
-- (this isn't really important with the newer version of data) final_results_prelim_v2.csv, it’s essentially all the raw data with random information about the data(for example, timestamp, what each row means, #s etc) stripped off of the collected data of ibex, I also added Condition_ID there to help experimenting with error rate if needed, 
+- RT_datasets: This Folder contain all the relevant processed(with added features such as surprisal versions from different models, parts of speech labels, correctness status of everry word read by every subject, frequancy, length, condition_ID of items etc) and raw versions of the reading time datasets(collected straight from IBEX). To view how the RT data collection maze experiment looked like, check out [this video](https://drive.google.com/file/d/1zrMKbcdGQ_fjrRkSFyE92X3Rt8vhEMqY/view?usp=sharing)
 
-- error_ind.csv, a df with sentence, subject_ID, condition_ID and whether or not a certain participant made mistake in a certain sentence, which is indicated in “correctness” column
+- all_analysis: This folder contains all R markdown notebooks containing the mixed effect lmer/bayesian regression model analysis and results reported in the publication.
 
-- final_study_all_data_v2.csv is the preprocessed data with all the information such as POS, Frequency, length, surprisal etc, it is all the data from final_v2_all.csv except for the sentences where participants made mistakes.
+- final_grounding_data: This folder contains the collected raw data from the groundedness rating experiment
 
-- final_data_analysis Copy.Rmd - the markdown notebook with analysis
+- generating_features: This folder contains the codes for generating all kinds of features that we later used to predict reading time/error occurence/surprisal difference etc. Notable features include surprisals from 11 different VLMs(9)/LLMs(2), frequency, open/closed pos, length etc. This folder also has the codes for adding condition_IDs to the raw data.
 
-- saved_models - folder with all the saved models, to understand which model is what, pls check the markdown notebook
+- groundedness_experiment_code: This folder includes all javascript and html files along with the stimuli image files necessary to develop the groundedness rating collection experiment. A notable addition to the existing jspsych experiment items are vertical sliders to collect groundedness rating in the most natural way. To view how this experiment looked like, please check out [this video](https://drive.google.com/file/d/1FVWvkWyMSDEragNnB8paxLBoe4PhKHvB/view?usp=sharing)
 
-- scatterplots.ipynb - this notebook has a bunch of plots and scatterplots for visualization and learning 
--final_grounding_data.zip - if you unzip it, you will find all the collected data from the groundedness score study
 
-- all_data_analysis_with_error_info.ipynb - this is the notebook with all the processing code - adding frequency, length, surprisal, groundedness, POS to the data collected from ibex
+- img: Just a folder containing most of the generated plots for the paper/thesis
 
-- final_grounding_data.zip - all the groundedness rating collected from prolific study 
+TODO: Add the link for the paper and the citation link when ready.
 
 
