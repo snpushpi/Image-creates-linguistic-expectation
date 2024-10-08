@@ -1,0 +1,2348 @@
+---
+title: "Analysis of Groundedness, RT facilitation and Surprisal Difference"
+output: 
+  html_document:
+    toc: true
+date: "2024-01-31"
+---
+
+```{r,echo=FALSE}
+library(lmerTest)
+library(lme4)
+library(brms)
+library(ggmcmc)
+library(mcmcplots)
+library(rstanarm)
+library(RColorBrewer) # needed for some extra colours in one of the graphs
+library(bayesplot)
+library(ggplot2)
+library(dplyr)
+library(tidybayes)
+library(modelr)
+library(tidyverse)
+library(gridExtra) # for grid.arrange() to print plots side-by-side
+library(languageR)
+library(arm)
+library(boot)
+library(broom.mixed)
+```
+
+```{r}
+install.packages("dotwhisker")
+install.packages("gapminder")
+```
+
+
+Loading the dataset here, correctness in that dataset has 3 levels, correct, wrong and unavailable, check the Readme to learn more about final_v2_all_with_error_info.csv
+
+```{r}
+dataset_with_error <- read_csv("./final_v2_all_with_error_info.csv",
+                   col_types = cols(Condition_ID=col_factor(levels=c("no", "wrong", "correct")),
+                                    POS = col_factor(levels = c("Open","Closed")))
+                   ) %>% filter(correctness != 'unavailable') 
+```
+
+
+# Adding model specific perplexity to the dataset (No need to run it once this cell has been run once)
+```{r}
+new_dataframe <- dataset_with_error %>% group_by(Condition_ID, Sentence, Subject_ID) %>% mutate(gpt2_perplexity = 2**(sum(gpt2_surp)/(length(strsplit(Sentence, "\\s+")[[1]])-1)), kosmos2_perplexity = 2**(sum(kosmos2_surp)/(length(strsplit(Sentence, "\\s+")[[1]])-1)), llama2_perplexity = 2**(sum(llama2_surp)/(length(strsplit(Sentence, "\\s+")[[1]])-1)), llava_7b_perplexity = 2**(sum(llava_7b_surp)/(length(strsplit(Sentence, "\\s+")[[1]])-1)),
+                                                                                    idefics_9b_perplexity = 2**(sum(idefics_9b_surp)/(length(strsplit(Sentence, "\\s+")[[1]])-1)), blip2_perplexity = 2**(sum(blip2_surp)/(length(strsplit(Sentence, "\\s+")[[1]])-1)))
+```
+
+```{r}
+subset(new_dataframe, Sentence == "A young woman sitting on a curb next to a fire hydrant writing on a notepad." & Condition_ID == "correct")
+```
+```{r}
+new_dataframe
+```
+```{r}
+df <- data.frame(
+  Condition_ID = c( 1, 1, 1, 2, 2, 2, 2, 2 ),
+  Sentence = c("This is a test","This is a test","This is a test", "Another test", "Another test", "This is a test","This is a test","This is a test"),
+  Word = c("is", "a", "test", "Another", "test",  "is", "a", "test"),
+  Value = c( 15, 20, 25, 30, 35, 20, 25, 30)
+)
+
+# Add a new column "avg" using dplyr
+df <- df %>%
+  group_by(Condition_ID, Sentence) %>%
+  mutate(avg = sum(Value) / (length(strsplit(Sentence, "\\s+")[[1]])-1))
+
+# View the modified dataframe
+print(df)
+```
+
+```{r}
+# Don't run again, it's been run once
+write.csv(new_dataframe,file = "final_v2_all_with_error_info.csv", row.names = FALSE)
+```
+
+```{r}
+dataset_with_error
+```
+
+
+# RT prediction model 
+
+In this section, I am just running the basic RT prediction model with all 3 conditions at the same time. I am intrerested in comparing (i) correct-image vs the other two conditions; and (ii) no-image vs wrong-image. For that I am using reverse helmert coding on the Condition_ID to compare no-image condition with wrong-image condition and correct-image condition with no and wrong image conditions. Besides, I am using usual sum contrast on POS (1,-1). 
+
+So I have 4 models with the following predictors -
+1. with POS and gpt2_surp (that will help explain effect of condition_ID change and if the effect of open POS is more pronounced than closed POS)
+2. with groundedness and gpt2_surp (that will help explain the effect of groundedness change since gpt2 is just text only)
+3. with POS and kosmos2_surp (that will help explain to what extent the effect of POS and condition_ID gets explained by the image conditioned surprisal)
+4. with groundedness and kosmos2_surp (that will help explain to what extent groundedness gets explained y the surprisal)
+
+```{r}
+dataset_with_error$Condition_ID.helm <- dataset_with_error$Condition_ID
+dataset_with_error$POS.sum <- dataset_with_error$POS
+
+my.rev.helmert = matrix(c(-1/2, 1/2, 0, -1/3, -1/3, 2/3), ncol = 2)
+contrasts(dataset_with_error$Condition_ID.helm) <- my.rev.helmert
+contrasts(dataset_with_error$POS.sum) <- contr.sum(2)
+```
+
+Confirming this is what we want it to look like. Here Contrast 1:  1/2 * (level wrong - level no) and Contrast 2: 1/3 * (level correct - (mean(level wrong + level no)), which is what we would need to interpret the coefficients of the Condition_ID.helm in the final model.
+
+```{r}
+contrasts(dataset_with_error$Condition_ID.helm)
+contrasts(dataset_with_error$POS.sum)
+```
+Now we can fit the 4 models I mentioned with maximal justified random effects structure 
+```{r}
+dataset_cons <- dataset_with_error %>% filter(correctness=="correct")
+dataset_cons$RT <- as.numeric(dataset_cons$RT)
+
+
+#RT_pred_brm_gpt2_pos <- brm(RT ~ Condition_ID.helm*POS.sum + gpt2_surp + Frequency + Length + (Condition_ID.helm*POS.sum + gpt2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_gpt2_pos,'saved_models/RT_pred_brm_gpt2_pos.RDS')
+RT_pred_brm_gpt2_pos <- readRDS('saved_models/RT_pred_brm_gpt2_pos.RDS')
+
+
+
+#RT_pred_brm_gpt2_groundedness <- brm(RT ~ Condition_ID.helm*groundedness + gpt2_surp + Frequency + Length + (Condition_ID.helm*groundedness + gpt2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_gpt2_groundedness,'saved_models/RT_pred_brm_gpt2_groundedness.RDS')
+RT_pred_brm_gpt2_groundedness <- readRDS('saved_models/RT_pred_brm_gpt2_groundedness.RDS')
+
+
+#RT_pred_brm_kosmos2_groundedness <- brm(RT ~ Condition_ID.helm*groundedness + kosmos2_surp + Frequency + Length + (Condition_ID.helm*groundedness + kosmos2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_kosmos2_groundedness, 'saved_models/RT_pred_brm_kosmos2_groundedness.RDS')
+RT_pred_brm_kosmos2_groundedness <- readRDS('saved_models/RT_pred_brm_kosmos2_groundedness.RDS')
+
+
+#RT_pred_brm_kosmos2_pos <- brm(RT ~ Condition_ID.helm*POS.sum + kosmos2_surp + Frequency + Length + (Condition_ID.helm*POS.sum + kosmos2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_kosmos2_pos,'saved_models/RT_pred_brm_kosmos2_pos.RDS')
+RT_pred_brm_kosmos2_pos <- readRDS('saved_models/RT_pred_brm_kosmos2_pos.RDS')
+
+
+#RT_pred_brm_blip2_pos <- brm(RT ~ Condition_ID.helm*POS.sum + blip2_surp + Frequency + Length + (Condition_ID.helm*POS.sum + blip2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_blip2_pos,'saved_models/RT_pred_brm_blip2_pos.RDS')
+RT_pred_brm_blip2_pos <- readRDS('saved_models/RT_pred_brm_blip2_pos.RDS')
+
+#RT_pred_brm_blip2_groundedness <- brm(RT ~ Condition_ID.helm*groundedness + blip2_surp + Frequency + Length + (Condition_ID.helm*groundedness + blip2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_blip2_groundedness,'saved_models/RT_pred_brm_blip2_groundedness.RDS')
+RT_pred_brm_blip2_groundedness <- readRDS('saved_models/RT_pred_brm_blip2_groundedness.RDS')
+
+#RT_pred_brm_llama2_pos <- brm(RT ~ Condition_ID.helm*POS.sum + llama2_surp + Frequency + Length + (Condition_ID.helm*POS.sum + llama2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_llama2_pos,'saved_models/RT_pred_brm_llama2_pos.RDS')
+
+RT_pred_brm_llama2_pos <- readRDS('saved_models/RT_pred_brm_llama2_pos.RDS')
+
+#RT_pred_brm_llama2_groundedness <- brm(RT ~ Condition_ID.helm*groundedness + llama2_surp + Frequency + Length + (Condition_ID.helm*groundedness + llama2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(RT_pred_brm_llama2_groundedness,'saved_models/RT_pred_brm_llama2_groundedness.RDS')
+
+RT_pred_brm_llama2_groundedness <- readRDS('saved_models/RT_pred_brm_llama2_groundedness.RDS')
+
+RT_pred_brm_llava_groundedness <- brm(RT ~ Condition_ID.helm*groundedness + llava_7b_surp + Frequency + Length + (Condition_ID.helm*groundedness + llava_7b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(RT_pred_brm_llava_groundedness,'saved_models/RT_pred_brm_llava_groundedness.RDS')
+RT_pred_brm_llava_groundedness <- readRDS('saved_models/RT_pred_brm_llava_groundedness.RDS')
+
+RT_pred_brm_llava_pos <- brm(RT ~ Condition_ID.helm*POS.sum + llava_7b_surp + Frequency + Length + (Condition_ID.helm*POS.sum + llava_7b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(RT_pred_brm_llava_pos, 'saved_models/RT_pred_brm_llava_pos.RDS')
+RT_pred_brm_llava_pos <- readRDS('saved_models/RT_pred_brm_llava_pos.RDS')
+
+RT_pred_brm_idefics_groundedness <- brm(RT ~ Condition_ID.helm*groundedness + idefics_9b_surp + Frequency + Length + (Condition_ID.helm*groundedness + idefics_9b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(RT_pred_brm_idefics_groundedness, 'saved_models/RT_pred_brm_idefics_groundedness.RDS')
+RT_pred_brm_idefics_groundedness <- readRDS('saved_models/RT_pred_brm_idefics_groundedness.RDS')
+
+RT_pred_brm_idefics_pos <- brm(RT ~ Condition_ID.helm*POS.sum + idefics_9b_surp + Frequency + Length + (Condition_ID.helm*POS.sum + idefics_9b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=dataset_cons, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(RT_pred_brm_idefics_pos,'saved_models/RT_pred_brm_idefics_pos.RDS')
+RT_pred_brm_idefics_pos <- readRDS('saved_models/RT_pred_brm_idefics_pos.RDS')
+
+```
+
+just a sanity check below to make sure that observed significant difference between no vs wrong makes sense with the type of models I tried before, it's important to try this one because this version of the dataset I am analyzing has more data than the past one, because now I am considering all words until someone make a mistake, as opposed to only the sentences for a participant where they made no mistake
+
+```{r}
+dataset_check <- dataset_cons %>% filter(Condition_ID!="correct")
+dataset_check$Condition_ID <- droplevels(dataset_check$Condition_ID)
+contrasts(dataset_check$Condition_ID) <- contr.sum(2)
+
+#model_check <- brm(RT ~ Condition_ID*POS.sum + gpt2_surp + Frequency + Length + (Condition_ID*POS.sum + gpt2_surp | Subject_ID)+ (Condition_ID | Group) + (Condition_ID | WordToken) + (Condition_ID | Word), data=dataset_check, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85), seed = 123)
+
+#summary(model_check)
+```
+
+
+The sanity check is indeed showing that there is a significant difference in RT between wrong and no conditions as well, so the observations I am intepreting from the above models is correct.
+
+To summarize the findings from above, for model (1), correct condition is significantly faster than wrong and no condition, and no condition is also significantly faster than wrong condition. The effect of POS is even more pronounced for Open words compared to closed class words in correct condition compared to the other two conditions. The distinction between open and closed class words isn't pronounced in no condition compared to wrong condition, as we can expect.
+
+For model (2), for 1 unit increase in groundedness score, the RT significantly drops in correct condition compared to the two other conditions. There's no such difference in wrong condition compared to no condition. gpt2 surprisal effect is in (20.41,27.90) interval.
+
+For model (3), for 1 unit increase in groundedness score, there is no significant difference between correct condition vs the two other conditions and no condition vs wrong condition for 1 unit increase of groundedness score. That makes sense, because in this case, kosmos2 surprisal explains all the effect, although the effect size is slightly smaller than gpt2 model in the same case, but that also makes sense, because kosmos2 does substantially better in the correct condition case, and no as good as gpt2 in the wrong condition case, so that kinda averages out. 
+
+For model (4),(compare with model (1)) correct condition isn't significantly faster than the two other conditions, neither is wrong condition significantly slower than the two other conditions. The same statements hold for interaction effects as well. The effect of POS is not significant for Open words compared to closed class words in correct condition compared to the other two conditions. This again makes sense, given that the surprisal model we used was image conditioned, and hence we can expect to see the effect of correct Condition_ID being explained away by the surprisal model. 
+
+To summarize the facts above, I will make two plots, one with groundedness interpretations and another with POS and condition_ID interpretations. Both plots will also have surprisals.
+
+
+
+
+#Dot whisker plots for RT Prediction (POS)
+
+```{r}
+library(dotwhisker)
+model_gpt2_pos <- tidy(RT_pred_brm_gpt2_pos, effects="fixed")
+model_llama2_pos <- tidy(RT_pred_brm_llama2_pos, effects = "fixed")
+model_blip2_pos <- tidy(RT_pred_brm_blip2_pos, effects = "fixed")
+model_kosmos2_pos <- tidy(RT_pred_brm_kosmos2_pos, effects = "fixed")
+model_llava_pos <- tidy(RT_pred_brm_llava_pos, effects = "fixed")
+model_idefics_pos <- tidy(RT_pred_brm_idefics_pos, effects = "fixed")
+  
+
+model_gpt2_pos$term[model_gpt2_pos$term == "gpt2_surp"] <- "surprisal"
+model_llama2_pos$term[model_llama2_pos$term == "llama2_surp"] <- "surprisal"
+model_blip2_pos$term[model_blip2_pos$term == "blip2_surp"] <- "surprisal"
+model_kosmos2_pos$term[model_kosmos2_pos$term == "kosmos2_surp"] <- "surprisal"
+model_llava_pos$term[model_llava_pos$term == "llava_7b_surp"] <- "surprisal"
+model_idefics_pos$term[model_idefics_pos$term == "idefics_9b_surp"] <- "surprisal"
+  
+  
+model_gpt2_pos <- model_gpt2_pos %>% mutate(model_type="Text")
+model_llama2_pos <- model_llama2_pos %>% mutate(model_type="Text")
+model_blip2_pos <- model_blip2_pos %>% mutate(model_type="Multimodal")
+model_kosmos2_pos <- model_kosmos2_pos %>% mutate(model_type="Multimodal")
+model_llava_pos <- model_llava_pos %>% mutate(model_type="Multimodal")
+model_idefics_pos<- model_idefics_pos %>% mutate(model_type="Multimodal")
+
+combined_data <- rbind(
+  transform(model_gpt2_pos, model = "GPT2"),
+  transform(model_llama2_pos, model = "LLAMA2"),
+  transform(model_blip2_pos, model = "BLIP2"),
+  transform(model_kosmos2_pos, model = "KOSMOS2"),
+  transform(model_llava_pos, model = "LLAVA"),
+  transform(model_idefics_pos, model="IDEFICS")
+  
+)
+
+
+effects_of_interest <- c("Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1","Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1","surprisal"), labels = c("Wrong vs no(ms)","Correct vs wrong&no mean(ms)","Change in RT in Wrong vs no for open POS(ms)","Change in RT in Correct vs wrong&no mean for open POS(ms)","Surprisal(ms/bit)"))
+
+
+dwplot(filtered_data , dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + theme_bw() + theme(axis.text=element_text(size=13))+ scale_y_discrete(labels = function(y) 
+    stringr::str_wrap(y, width = 15)) +  xlab("Coefficient Estimate & 95% CI")
+ggsave("RT_prediction_POS.pdf", width=10,height=6)
+```
+
+
+
+#Dot whisker plots for RT Prediction (Groundedness)
+
+```{r}
+model_gpt2_groundedness <- tidy(RT_pred_brm_gpt2_groundedness, effects="fixed")
+model_llama2_groundedness <- tidy(RT_pred_brm_llama2_groundedness, effects = "fixed")
+model_blip2_groundedness <- tidy(RT_pred_brm_blip2_groundedness, effects = "fixed")
+model_kosmos2_groundedness <- tidy(RT_pred_brm_kosmos2_groundedness, effects = "fixed")
+model_llava_groundedness <- tidy(RT_pred_brm_llava_groundedness, effects = "fixed")
+model_idefics_groundedness <- tidy(RT_pred_brm_idefics_groundedness, effects = "fixed")
+
+model_gpt2_groundedness$term[model_gpt2_groundedness$term == "gpt2_surp"] <- "surprisal"
+model_llama2_groundedness$term[model_llama2_groundedness$term == "llama2_surp"] <- "surprisal"
+model_blip2_groundedness$term[model_blip2_groundedness$term == "blip2_surp"] <- "surprisal"
+model_kosmos2_groundedness$term[model_kosmos2_groundedness$term == "kosmos2_surp"] <- "surprisal"
+model_llava_groundedness$term[model_llava_groundedness$term == "llava_7b_surp"] <- "surprisal"
+model_idefics_groundedness$term[model_idefics_groundedness$term == "idefics_9b_surp"] <- "surprisal"
+
+model_gpt2_groundedness <- model_gpt2_groundedness %>% mutate(model_type="Text")
+model_llama2_groundedness <- model_llama2_groundedness %>% mutate(model_type="Text")
+model_blip2_groundedness <- model_blip2_groundedness %>% mutate(model_type="Multimodal")
+model_kosmos2_groundedness <- model_kosmos2_groundedness %>% mutate(model_type="Multimodal")
+model_llava_groundedness <- model_llava_groundedness %>% mutate(model_type="Multimodal")
+model_idefics_groundedness <- model_idefics_groundedness %>% mutate(model_type="Multimodal")
+
+combined_data <- rbind(
+  transform(model_gpt2_groundedness, model = "GPT2"),
+  transform(model_llama2_groundedness, model = "LLAMA2"),
+  transform(model_blip2_groundedness, model = "BLIP2"),
+  transform(model_kosmos2_groundedness, model = "KOSMOS2"),
+  transform(model_llava_groundedness, model = "LLAVA"),
+  transform(model_idefics_groundedness, model="IDEFICS")
+)
+
+
+effects_of_interest <- c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal"), labels = c("Wrong vs no for 1 unit increase in groundedness score(ms)","Correct vs wrong&no mean for 1 unit increase in groundedness score(ms)","Surprisal(ms/bit)"))
+
+
+dwplot(filtered_data, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + theme_bw() + theme(axis.text=element_text(size=15)) +  scale_y_discrete(labels = function(y) 
+    stringr::str_wrap(y, width = 17)) + xlab("Coefficient Estimate & 95% CI")
+ggsave("RT_pred_groundedness.pdf",width=10,height=7)
+```
+
+
+
+
+
+
+```{r}
+model_A <- RT_pred_brm_gpt2_groundedness
+model_B <- RT_pred_brm_kosmos2_groundedness
+
+model_A_fixed <- tidy(model_A, effects = "fixed")
+
+# Extract fixed effects for model B
+model_B_fixed <- tidy(model_B, effects = "fixed")
+
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
+combined_data <- rbind(
+  transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
+  transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
+)
+effects_of_interest <- c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal"), labels = c("Wrong vs no for 1 unit increase in groundedness score","Correct vs wrong&no mean for 1 unit increase in groundedness score","1 unit increase in surprisal"))
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = .9), width = 0.4) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                position = position_dodge(width = 0.9), width = 0.2) +
+  labs(x = "Effect", y = "Estimate and 95% CI") +
+  scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+    labs(x = "Effect", y = "RT facilitation estimate and 95% CI") +
+  theme_minimal()
+```
+#TODO: Add box & whiskers 
+
+```{r}
+model_A <- RT_pred_brm_gpt2_pos
+model_B <- RT_pred_brm_kosmos2_pos
+
+model_A_fixed <- tidy(model_A, effects = "fixed")
+
+# Extract fixed effects for model B
+model_B_fixed <- tidy(model_B, effects = "fixed")
+
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
+combined_data <- rbind(
+  transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
+  transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
+)
+effects_of_interest <- c("Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1","Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","Condition_ID.helm1:POS.sum1","Condition_ID.helm2:POS.sum1","surprisal"), labels = c("Wrong vs no","Correct vs wrong&no mean","Change in facilitation in Wrong vs no for open POS","Change in facilitation in Correct vs wrong&no mean for open POS","1 unit increase in surprisal"))
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.4) +
+    geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                  position = position_dodge(width = 0.9), width = 0.2) +
+  #scale_x_discrete(guide = guide_axis(n.dodge=3))+
+  scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+    labs(x = "Effect", y = "RT facilitation estimate and 95% CI") +
+    theme_minimal()
+    #theme(axis.text.x = element_text(angle = 90, hjust=1)) 
+```
+# RT prediction model (only closed class POS)
+
+The goal of this section is to analyze if facilitation is present even for closed class words in correct condition. The encoding is the same as above, with wrong being compared to no(contrast 1 ) and correct being compared no wrong and no(contrast 2). The significance of the second contrast will tell us if facilitation for closed class words is significant in correct condition compared to the two other conditions. 
+
+I am running two models here again, to compare their effects.
+
+```{r}
+dataset_cons <- dataset_with_error %>% filter(correctness=="correct")
+dataset_cons$RT <- as.numeric(dataset_cons$RT)
+
+closed_data <- dataset_cons %>% filter(POS=="Closed")
+closed_data$POS <- droplevels(closed_data$POS)
+
+model_closed_gpt2 <- brm(RT ~ Condition_ID.helm + gpt2_surp + Frequency + Length + (Condition_ID.helm + gpt2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_closed_gpt2, 'saved_models/model_closed_gpt2.RDS')
+model_closed_gpt2 <- readRDS('saved_models/model_closed_gpt2.RDS')
+
+model_closed_kosmos2 <- brm(RT ~ Condition_ID.helm + kosmos2_surp + Frequency + Length + (Condition_ID.helm + kosmos2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_closed_kosmos2, 'saved_models/model_closed_kosmos2.RDS')
+model_closed_kosmos2 <- readRDS('saved_models/model_closed_kosmos2.RDS')
+
+
+model_closed_blip2 <- brm(RT ~ Condition_ID.helm + blip2_surp + Frequency + Length + (Condition_ID.helm + blip2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_closed_blip2, 'saved_models/model_closed_blip2.RDS') 
+
+model_closed_blip2 <- readRDS("saved_models/model_closed_blip2.RDS")
+
+model_closed_llama2 <- brm(RT ~ Condition_ID.helm + llama2_surp + Frequency + Length + (Condition_ID.helm + llama2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_closed_llama2, 'saved_models/model_closed_llama2.RDS') 
+
+model_closed_llama2 <- readRDS("saved_models/model_closed_llama2.RDS")
+
+model_closed_llava <- brm(RT ~ Condition_ID.helm + llava_7b_surp + Frequency + Length + (Condition_ID.helm + llava_7b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_closed_llava, 'saved_models/model_closed_llava.RDS') 
+
+model_closed_llava <- readRDS('saved_models/model_closed_llava.RDS')
+
+model_closed_idefics <- brm(RT ~ Condition_ID.helm + idefics_9b_surp + Frequency + Length + (Condition_ID.helm + idefics_9b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=closed_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_closed_idefics, 'saved_models/model_closed_idefics.RDS') 
+
+model_closed_idefics <- readRDS('saved_models/model_closed_idefics.RDS')
+
+```
+# Dot & Whiskers, RT Prediction, closed-class only
+```{r}
+model_gpt2 <- tidy(model_closed_gpt2, effects="fixed")
+model_llama2 <- tidy(model_closed_llama2, effects = "fixed")
+model_blip2 <- tidy(model_closed_blip2, effects = "fixed")
+model_kosmos2 <- tidy(model_closed_kosmos2, effects = "fixed")
+model_llava <- tidy(model_closed_llava, effects = "fixed")
+model_idefics <- tidy(model_closed_idefics, effects = "fixed")
+
+model_gpt2$term[model_gpt2$term == "gpt2_surp"] <- "surprisal"
+model_llama2$term[model_llama2$term == "llama2_surp"] <- "surprisal"
+model_blip2$term[model_blip2$term == "blip2_surp"] <- "surprisal"
+model_kosmos2$term[model_kosmos2$term == "kosmos2_surp"] <- "surprisal"
+model_llava$term[model_llava$term == "llava_7b_surp"] <- "surprisal"
+model_idefics$term[model_idefics$term == "idefics_9b_surp"] <- "surprisal"
+
+model_gpt2 <- model_gpt2 %>% mutate(model_type="Text")
+model_llama2 <- model_llama2 %>% mutate(model_type="Text")
+model_blip2 <- model_blip2 %>% mutate(model_type="Multimodal")
+model_kosmos2 <- model_kosmos2 %>% mutate(model_type="Multimodal")
+model_llava <- model_llava %>% mutate(model_type="Multimodal")
+model_idefics <- model_idefics %>% mutate(model_type="Multimodal")
+
+combined_data <- rbind(
+  transform(model_gpt2, model = "GPT2"),
+  transform(model_llama2, model = "LLAMA2"),
+  transform(model_blip2, model = "BLIP2"),
+  transform(model_kosmos2, model = "KOSMOS2"),
+  transform(model_llava, model="LLAVA"),
+  transform(model_idefics, model="IDEFICS")
+  
+)
+effects_of_interest <- c("Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","surprisal"), labels = c("Wrong vs no(ms)","Correct vs wrong&no mean(ms)","Surprisal(ms/bit)"))
+
+
+dwplot(filtered_data, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + theme_bw() + theme(axis.text=element_text(size=15)) +  xlab("Coefficient Estimate & 95%CI")
+ggsave("RT_pred_closed.pdf",height = 5, width = 8)
+```
+
+```{r}
+open_data <- dataset_cons %>% filter(POS=="Open")
+open_data$POS <- droplevels(open_data$POS)
+
+model_open_gpt2 <- brm(RT ~ Condition_ID.helm + gpt2_surp + Frequency + Length + (Condition_ID.helm + gpt2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=open_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_open_gpt2, 'saved_models/model_open_gpt2.RDS')
+model_open_gpt2 <- readRDS('saved_models/model_open_gpt2.RDS')
+
+model_open_kosmos2 <- brm(RT ~ Condition_ID.helm + kosmos2_surp + Frequency + Length + (Condition_ID.helm + kosmos2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=open_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_open_kosmos2, 'saved_models/model_open_kosmos2.RDS')
+model_open_kosmos2 <- readRDS('saved_models/model_open_kosmos2.RDS')
+
+
+model_open_blip2 <- brm(RT ~ Condition_ID.helm + blip2_surp + Frequency + Length + (Condition_ID.helm + blip2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=open_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_open_blip2, 'saved_models/model_open_blip2.RDS') 
+
+model_open_blip2 <- readRDS("saved_models/model_open_blip2.RDS")
+
+model_open_llama2 <- brm(RT ~ Condition_ID.helm + llama2_surp + Frequency + Length + (Condition_ID.helm + llama2_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=open_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_open_llama2, 'saved_models/model_open_llama2.RDS') 
+
+model_open_llama2 <- readRDS("saved_models/model_open_llama2.RDS")
+
+model_open_llava <- brm(RT ~ Condition_ID.helm + llava_7b_surp + Frequency + Length + (Condition_ID.helm + llava_7b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=open_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_open_llava, 'saved_models/model_open_llava.RDS') 
+
+model_open_llava <- readRDS('saved_models/model_open_llava.RDS')
+
+model_open_idefics <- brm(RT ~ Condition_ID.helm + idefics_9b_surp + Frequency + Length + (Condition_ID.helm + idefics_9b_surp | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken) + (Condition_ID.helm | Word), data=open_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(model_open_idefics, 'saved_models/model_open_idefics.RDS') 
+
+model_open_idefics <- readRDS('saved_models/model_open_idefics.RDS')
+```
+
+
+```{r}
+model_gpt2 <- tidy(model_open_gpt2, effects="fixed")
+model_llama2 <- tidy(model_open_llama2, effects = "fixed")
+model_blip2 <- tidy(model_open_blip2, effects = "fixed")
+model_kosmos2 <- tidy(model_open_kosmos2, effects = "fixed")
+model_llava <- tidy(model_open_llava, effects = "fixed")
+model_idefics <- tidy(model_open_idefics, effects = "fixed")
+
+model_gpt2$term[model_gpt2$term == "gpt2_surp"] <- "surprisal"
+model_llama2$term[model_llama2$term == "llama2_surp"] <- "surprisal"
+model_blip2$term[model_blip2$term == "blip2_surp"] <- "surprisal"
+model_kosmos2$term[model_kosmos2$term == "kosmos2_surp"] <- "surprisal"
+model_llava$term[model_llava$term == "llava_7b_surp"] <- "surprisal"
+model_idefics$term[model_idefics$term == "idefics_9b_surp"] <- "surprisal"
+
+model_gpt2 <- model_gpt2 %>% mutate(model_type="Text")
+model_llama2 <- model_llama2 %>% mutate(model_type="Text")
+model_blip2 <- model_blip2 %>% mutate(model_type="Multimodal")
+model_kosmos2 <- model_kosmos2 %>% mutate(model_type="Multimodal")
+model_llava <- model_llava %>% mutate(model_type="Multimodal")
+model_idefics <- model_idefics %>% mutate(model_type="Multimodal")
+
+combined_data <- rbind(
+  transform(model_gpt2, model = "GPT2"),
+  transform(model_llama2, model = "LLAMA2"),
+  transform(model_blip2, model = "BLIP2"),
+  transform(model_kosmos2, model = "KOSMOS2"),
+  transform(model_llava, model="LLAVA"),
+  transform(model_idefics, model="IDEFICS")
+  
+)
+effects_of_interest <- c("Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","surprisal"), labels = c("Wrong vs no(ms)","Correct vs wrong&no mean(ms)","Surprisal(ms/bit)"))
+
+
+dwplot(filtered_data, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + theme_bw() + theme(axis.text=element_text(size=15)) +  xlab("Coefficient Estimate & 95%CI")
+ggsave("RT_pred_open.pdf",height = 5, width = 8)
+```
+
+```{r}
+print(log10(dataset_with_error %>% filter(Condition_ID=="correct") %>% filter(correctness=="correct") %>% nrow()))
+print(log10(dataset_with_error %>% filter(Condition_ID=="no") %>% filter(correctness=="correct") %>% nrow()))
+print(log10(dataset_with_error %>% filter(Condition_ID=="wrong") %>% filter(correctness=="correct") %>% nrow()))
+
+print(log10(dataset_with_error %>% filter(Condition_ID=="correct") %>% filter(correctness=="wrong") %>% nrow()))
+print(log10(dataset_with_error %>% filter(Condition_ID=="no") %>% filter(correctness=="wrong") %>% nrow()))
+print(log10(dataset_with_error %>% filter(Condition_ID=="wrong") %>% filter(correctness=="wrong") %>% nrow()))
+```
+```{r}
+print(dataset_with_error %>% filter(Condition_ID=="correct") %>% filter(correctness=="correct") %>% nrow())
+print(dataset_with_error %>% filter(Condition_ID=="correct") %>% filter(correctness=="wrong") %>% nrow())
+
+print(dataset_with_error %>% filter(Condition_ID=="no") %>% filter(correctness=="correct") %>% nrow())
+print(dataset_with_error %>% filter(Condition_ID=="no") %>% filter(correctness=="wrong") %>% nrow())
+
+print(dataset_with_error %>% filter(Condition_ID=="wrong") %>% filter(correctness=="correct") %>% nrow())
+print(dataset_with_error %>% filter(Condition_ID=="wrong") %>% filter(correctness=="wrong") %>% nrow())
+```
+
+```{r}
+# Assuming you have the following data
+group_names <- c("Correct Condition", "No Condition", "Wrong Condition")
+subgroup_names <- c("Correct", "Wrong")
+values <- matrix(c(log10(9588), log10(95), log10(9523), log10(84), log10(9465), log10(124)), ncol = 2, byrow = TRUE)
+colnames(values) <- subgroup_names
+rownames(values) <- group_names
+
+# Convert the matrix to a dataframe
+df <- as.data.frame(values)
+df$Group <- rownames(df)
+df <- tidyr::pivot_longer(df, cols = -Group, names_to = "Subgroup", values_to = "Value")
+
+# Create the bar plot
+library(ggplot2)
+ggplot(df, aes(x = Group, y = Value, fill = Subgroup)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  labs(title = "Number of Correct and wrong choices in each condition in log scale", x = "Conditions", y = "Number of Correct and wrong choices in log scale", fill = "Subgroups") +
+  theme_minimal()
+
+```
+
+
+
+
+# Effect of surprisal/frequency/length varying across conditions
+
+```{r}
+correct_data <- dataset_cons %>% filter(Condition_ID=="correct")
+wrong_data <- dataset_cons %>% filter(Condition_ID=="wrong")
+no_data <- dataset_cons %>% filter(Condition_ID=="no")
+
+gpt2_correct <- brm(RT ~ groundedness + POS.sum + gpt2_surp + Frequency + Length + (groundedness + gpt2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=correct_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+gpt2_wrong <- brm(RT ~ groundedness + POS.sum + gpt2_surp + Frequency + Length + (groundedness + gpt2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=wrong_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+gp2_no <- brm(RT ~ groundedness + POS.sum + gpt2_surp + Frequency + Length + (groundedness + gpt2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=no_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+blip2_correct <- brm(RT ~ groundedness + POS.sum + blip2_surp + Frequency + Length + (groundedness + blip2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=correct_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+blip2_wrong <- brm(RT ~ groundedness + POS.sum + blip2_surp + Frequency + Length + (groundedness + blip2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=wrong_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+blip2_no <- brm(RT ~ groundedness + POS.sum + blip2_surp + Frequency + Length + (groundedness + blip2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=no_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+llama2_correct <- brm(RT ~ groundedness + POS.sum + llama2_surp + Frequency + Length + (groundedness + llama2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=correct_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+llama2_wrong <- brm(RT ~ groundedness + POS.sum + llama2_surp + Frequency + Length + (groundedness + llama2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=wrong_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+llama2_no <- brm(RT ~ groundedness + POS.sum + llama2_surp + Frequency + Length + (groundedness + llama2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=no_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+kosmos2_correct <- brm(RT ~ groundedness + POS.sum + kosmos2_surp + Frequency + Length + (groundedness + kosmos2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=correct_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+kosmos2_wrong <- brm(RT ~ groundedness + POS.sum + kosmos2_surp + Frequency + Length + (groundedness + kosmos2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=wrong_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+kosmos2_no <- brm(RT ~ groundedness + POS.sum + kosmos2_surp + Frequency + Length + (groundedness + kosmos2_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=no_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+llava_correct <- brm(RT ~ groundedness + POS.sum + llava_7b_surp + Frequency + Length + (groundedness + llava_7b_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=correct_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+llava_wrong <- brm(RT ~ groundedness + POS.sum + llava_7b_surp + Frequency + Length + (groundedness + llava_7b_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=wrong_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+llava_no <- brm(RT ~ groundedness + POS.sum + llava_7b_surp + Frequency + Length + (groundedness + llava_7b_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=no_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+idefics_correct <- brm(RT ~ groundedness + POS.sum + idefics_9b_surp + Frequency + Length + (groundedness + idefics_9b_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=correct_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+idefics_wrong <- brm(RT ~ groundedness + POS.sum + idefics_9b_surp + Frequency + Length + (groundedness + idefics_9b_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=wrong_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+idefics_no <- brm(RT ~ groundedness + POS.sum +idefics_9b_surp + Frequency + Length + (groundedness + idefics_9b_surp | Subject_ID)+ (1 | Group) + (1 | WordToken) + (1 | Word), data=no_data, warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+```
+
+```{r}
+saveRDS(gpt2_correct,"saved_models/gpt2_correct.RDS")
+saveRDS(gp2_no,"saved_models/gpt2_no.RDS")
+saveRDS(gpt2_wrong,"saved_models/gpt2_wrong.RDS")
+
+saveRDS(blip2_correct,"saved_models/blip2_correct.RDS")
+saveRDS(blip2_no,"saved_models/blip2_no.RDS")
+saveRDS(blip2_wrong,"saved_models/blip2_wrong.RDS")
+
+saveRDS(kosmos2_no,"saved_models/kosmos2_no.RDS")
+saveRDS(kosmos2_wrong,"saved_models/kosmos2_wrong.RDS")
+saveRDS(kosmos2_correct,"saved_models/kosmos2_correct.RDS")
+
+saveRDS(llama2_correct,"saved_models/llama2_correct.RDS")
+saveRDS(llama2_no,"saved_models/llama2_no.RDS")
+saveRDS(llama2_wrong,"saved_models/llama2_wrong.RDS")
+
+saveRDS(llava_correct,"saved_models/llava_correct.RDS")
+saveRDS(llava_no,"saved_models/llava_no.RDS")
+saveRDS(llava_wrong,"saved_models/llava_wrong.RDS")
+
+saveRDS(idefics_correct,"saved_models/idefics_correct.RDS")
+saveRDS(idefics_no,"saved_models/idefics_no.RDS")
+saveRDS(idefics_wrong,"saved_models/idefics_wrong.RDS")
+```
+
+```{r}
+gpt2_correct <- readRDS("saved_models/gpt2_correct.RDS")
+gp2_no <- readRDS("saved_models/gpt2_no.RDS")
+gpt2_wrong <- readRDS("saved_models/gpt2_wrong.RDS")
+
+blip2_correct <- readRDS("saved_models/blip2_correct.RDS")
+blip2_no <- readRDS("saved_models/blip2_no.RDS")
+blip2_wrong <- readRDS("saved_models/blip2_wrong.RDS")
+
+kosmos2_no <- readRDS("saved_models/kosmos2_no.RDS")
+kosmos2_wrong <- readRDS("saved_models/kosmos2_wrong.RDS")
+kosmos2_correct <- readRDS("saved_models/kosmos2_correct.RDS")
+
+llama2_correct <- readRDS("saved_models/llama2_correct.RDS")
+llama2_no<- readRDS("saved_models/llama2_no.RDS")
+llama2_wrong <- readRDS("saved_models/llama2_wrong.RDS")
+
+llava_correct<- readRDS("saved_models/llava_correct.RDS")
+llava_no <- readRDS("saved_models/llava_no.RDS")
+llava_wrong <- readRDS("saved_models/llava_wrong.RDS")
+
+idefics_correct <- readRDS("saved_models/idefics_correct.RDS")
+idefics_no <- readRDS("saved_models/idefics_no.RDS")
+idefics_wrong <- readRDS("saved_models/idefics_wrong.RDS")
+```
+
+```{r}
+return_dataframe<- function(model1,model2,model3,model4, model5, model6){
+  #gpt2,llama2,blip2,kosmos2 in that order
+  model_gpt2 <- tidy(model1, effects="fixed")
+  model_llama2 <- tidy(model2, effects = "fixed")
+  model_blip2 <- tidy(model3, effects = "fixed")
+  model_kosmos2 <- tidy(model4, effects = "fixed")
+  model_llava <- tidy(model5, effects = "fixed")
+  model_idefics <- tidy(model6, effects = "fixed")
+  
+  model_gpt2$term[model_gpt2$term == "gpt2_surp"] <- "surprisal"
+  model_llama2$term[model_llama2$term == "llama2_surp"] <- "surprisal"
+  model_blip2$term[model_blip2$term == "blip2_surp"] <- "surprisal"
+  model_kosmos2$term[model_kosmos2$term == "kosmos2_surp"] <- "surprisal"
+  model_llava$term[model_llava$term == "llava_7b_surp"] <- "surprisal"
+  model_idefics$term[model_idefics$term == "idefics_9b_surp"] <- "surprisal"
+  
+  model_gpt2 <- model_gpt2 %>% mutate(model_type="Text")
+  model_llama2 <- model_llama2 %>% mutate(model_type="Text")
+  model_blip2 <- model_blip2 %>% mutate(model_type="Multimodal")
+  model_kosmos2 <- model_kosmos2 %>% mutate(model_type="Multimodal")
+  model_llava <- model_llava %>% mutate(model_type="Multimodal")
+  model_idefics <- model_idefics %>% mutate(model_type="Multimodal")
+    
+  combined_data <- rbind(
+    transform(model_gpt2, model = "GPT2"),
+    transform(model_llama2, model = "LLAMA2"),
+    transform(model_blip2, model = "BLIP2"),
+    transform(model_kosmos2, model = "KOSMOS2"),
+    transform(model_llava, model="LLAVA"),
+    transform(model_idefics, model="IDEFICS")
+)
+  effects_of_interest <- c("surprisal","groundedness","Frequency","Length")
+  filtered_data <- combined_data %>% 
+    filter(term %in% effects_of_interest)
+  
+  filtered_data$term <- factor(filtered_data$term, levels = c("Frequency","Length","groundedness","surprisal"), labels = c("Frequency(ms/bit)","Length(ms/character)","Groundedness(ms/rating point)","Surprisal(ms/bit)"))
+  
+  return(filtered_data)
+  
+}
+
+all_data_correct <- return_dataframe(gpt2_correct,llama2_correct,blip2_correct,kosmos2_correct,llava_correct,idefics_correct) 
+all_data_wrong <- return_dataframe(gpt2_wrong,llama2_wrong,blip2_wrong,kosmos2_wrong,llava_wrong,idefics_wrong)
+all_data_no <- return_dataframe(gp2_no,llama2_no,blip2_no,kosmos2_no,llava_no,idefics_no)
+
+combined_data <- rbind(
+  transform(all_data_correct,condition="correct"),
+  transform(all_data_no,condition="no"),
+  transform(all_data_wrong,condition="wrong")
+)
+
+dwplot(combined_data , dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + xlab("Coefficient Estimate & 95% CI") + ylab("") +
+    ggtitle("") + scale_y_discrete(labels = function(y) 
+   stringr::str_wrap(y, width = 10)) + theme(axis.text=element_text(size=10)) + facet_wrap(~condition) + theme_bw()
+ggsave("all_conditions.pdf",width=8,height=5)
+```
+
+# Bar plots with RT 
+
+```{r}
+se <- function(x) {
+  sd(x) / sqrt(length(x))
+}
+spelled_out_conditions <- c("correct"="Correct Image","no"="No Image","wrong"="Wrong Image")
+rts_by_word_token <-
+  dataset_with_error %>%
+  filter(correctness!="wrong") %>%
+  group_by(WordToken,Condition_ID,Group,POS) %>%
+  summarize(RT=mean(RT)) %>%
+  group_by(Condition_ID,Group,POS) %>%
+  summarize(RT=mean(RT)) %>%
+  group_by(Condition_ID,POS) %>%
+  summarize(rt=mean(RT),rt_se=se(RT)) %>%
+  mutate(Condition=spelled_out_conditions[as.character(Condition_ID)],
+         `Part of Speech`=POS)
+my_dodge <- position_dodge(0.9)  
+ggplot(rts_by_word_token,aes(x=Condition,y=rt,fill=`Part of Speech`)) +
+    geom_bar(stat="identity", 
+           position=my_dodge, color = "black") +
+  geom_errorbar(aes(ymin=rt-rt_se, ymax=rt+rt_se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab("RT ± Standard Error") +
+  theme_bw() +
+  theme(legend.position = c(0.4,0.91),
+        legend.direction="horizontal") + coord_cartesian(ylim=c(500,1200))
+#ggsave("/tmp/RT-by-condition-and-POS.png",height=4,width=4)
+#ggsave("/tmp/RT-by-condition-and-POS.pdf",height=3,width=4)
+```
+
+
+
+# Error rate analysis 
+In this section, I wanted to analyze the error rates and what is a good predictor of when people will make errors. On that note, I first analyzed the relationship between blip2 surprisal and error occurence 
+
+```{r}
+dataset_with_error_avg <- dataset_with_error %>% 
+  group_by(WordToken,Condition_ID,Group,correctness) %>%
+  summarize(blip2_surp=mean(blip2_surp)) %>%
+  group_by(Condition_ID,Group,correctness) %>%
+  summarize(blip2_surp=mean(blip2_surp)) %>%
+  group_by(Condition_ID,correctness) %>%
+  summarize(blip2_surp_avg=mean(blip2_surp),blip2_surp_se = sd(blip2_surp)/sqrt(n())) 
+  
+```
+```{r}
+dataset_with_error_avg
+dataset_with_error_avg <- dataset_with_error_avg %>% rename(`Correctness Status of Words`=correctness)
+dataset_with_error_avg
+```
+```{r}
+my_dodge <- position_dodge(0.9)  
+ggplot(dataset_with_error_avg,aes(x=Condition_ID,y=blip2_surp_avg,fill=`Correctness Status of Words`)) +
+    geom_bar(stat="identity", 
+           position=my_dodge,color = "black") +
+  geom_errorbar(aes(ymin=blip2_surp_avg-blip2_surp_se, ymax=blip2_surp_avg+blip2_surp_se), width=.2,
+                 position=position_dodge(.9)) +
+  ylab("BLIP2_surprisal ± Standard Error") +
+  ylim(c(0,12)) +
+  #scale_fill_manual(values = c("orange", "green"))
+  theme_bw() +
+  theme(legend.position = c(0.5,0.93),
+        legend.direction="horizontal")
+ggsave("img/blip2_error.pdf",height=4,width=4)
+```
+
+```{r}
+contrasts(dataset_with_error$POS.sum)
+```
+
+
+# Error prediction model
+
+The same as before, we do the same kind of analysis, with 4 types of models and ask similar questions, make plots to demonstrate the results
+
+```{r}
+dataset_with_error$correctness <- factor(dataset_with_error$correctness)
+
+#rescaling the POS.sum to make sure that the model converges
+
+dataset_with_error$POS.helm <- dataset_with_error$POS
+contrasts(dataset_with_error$POS.helm) <- c(1/2,-1/2)
+#error_pred_gpt2_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + gpt2_surp + (Condition_ID.helm | Subject_ID) + (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+
+#saveRDS(error_pred_gpt2_pos_brm,'saved_models/error_pred_gpt2_pos_brm.RDS')
+error_pred_gpt2_pos_brm <- readRDS('saved_models/error_pred_gpt2_pos_brm.RDS')
+
+
+#error_pred_gpt2_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + gpt2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_gpt2_groundedness_brm,'saved_models/error_pred_gpt2_groundedness_brm.RDS')
+error_pred_gpt2_groundedness_brm <- readRDS('saved_models/error_pred_gpt2_groundedness_brm.RDS')
+
+
+#error_pred_kosmos2_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + kosmos2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+
+#saveRDS(error_pred_kosmos2_groundedness_brm, 'saved_models/error_pred_kosmos2_groundedness_brm.RDS')
+error_pred_kosmos2_groundedness_brm <- readRDS('saved_models/error_pred_kosmos2_groundedness_brm.RDS')
+
+
+#error_pred_brm_kosmos2_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + kosmos2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_brm_kosmos2_pos_brm,'saved_models/error_pred_brm_kosmos2_pos_brm.RDS')
+error_pred_kosmos2_pos_brm <- readRDS('saved_models/error_pred_brm_kosmos2_pos_brm.RDS')
+
+#error_pred_brm_llama2_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + llama2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_brm_llama2_pos_brm,'saved_models/error_pred_brm_llama2_pos_brm.RDS')
+error_pred_llama2_pos_brm <- readRDS('saved_models/error_pred_brm_llama2_pos_brm.RDS')
+
+#error_pred_llama2_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + llama2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_llama2_groundedness_brm,'saved_models/error_pred_llama2_groundedness_brm.RDS')
+error_pred_llama2_groundedness_brm <- readRDS('saved_models/error_pred_llama2_groundedness_brm.RDS')
+
+#error_pred_brm_blip2_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + blip2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_brm_blip2_pos_brm,'saved_models/error_pred_brm_blip2_pos_brm.RDS')
+error_pred_blip2_pos_brm <- readRDS('saved_models/error_pred_brm_blip2_pos_brm.RDS')
+
+#error_pred_brm_blip2_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + blip2_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+#saveRDS(error_pred_brm_blip2_groundedness_brm,'saved_models/error_pred_brm_blip2_groundedness_brm.RDS')
+error_pred_blip2_groundedness_brm <- readRDS('saved_models/error_pred_brm_blip2_groundedness_brm.RDS')
+
+error_pred_llava_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + llava_7b_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(error_pred_llava_groundedness_brm,'saved_models/error_pred_llava_groundedness_brm.RDS')
+error_pred_llava_groundedness_brm <- readRDS('saved_models/error_pred_llava_groundedness_brm.RDS')
+
+error_pred_llava_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + llava_7b_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(error_pred_llava_pos_brm,'saved_models/error_pred_llava_pos_brm.RDS')
+error_pred_llava_pos_brm <- readRDS('saved_models/error_pred_llava_pos_brm.RDS')
+
+error_pred_idefics_groundedness_brm <- brm(correctness ~ Condition_ID.helm*groundedness + idefics_9b_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(error_pred_idefics_groundedness_brm,'saved_models/error_pred_idefics_groundedness_brm.RDS')
+error_pred_idefics_groundedness_brm <- readRDS('saved_models/error_pred_idefics_groundedness_brm.RDS')
+
+error_pred_idefics_pos_brm <- brm(correctness ~ Condition_ID.helm*POS.helm + idefics_9b_surp + (Condition_ID.helm | Subject_ID)+ (Condition_ID.helm | Group) + (Condition_ID.helm | WordToken), data=dataset_with_error, family = "bernoulli",warmup = 1000, iter = 4000,cores = 6, chains = 2, control = list(adapt_delta = 0.85),seed = 123)
+
+saveRDS(error_pred_idefics_pos_brm,'saved_models/error_pred_idefics_pos_brm.RDS')
+error_pred_idefics_pos_brm <- readRDS('saved_models/error_pred_idefics_pos_brm.RDS')
+
+```
+
+
+```{r}
+library(broom.mixed)
+model_A <- error_pred_gpt2_groundedness_brm
+model_B <- error_pred_kosmos2_groundedness_brm
+
+
+model_A_fixed <- tidy(model_A, effects = "fixed")
+
+# Extract fixed effects for model B
+model_B_fixed <- tidy(model_B, effects = "fixed")
+
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
+combined_data <- rbind(
+  transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
+  transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
+)
+effects_of_interest <- c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal"), labels = c("Wrong vs no","Correct vs wrong&no mean","1 unit increase in Surprisal"))
+
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.4) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                position = position_dodge(width = 0.9), width = 0.2) +
+  labs(x = "Effect", y = "Estimate & 95% CI of difference in the predicted log odds") +
+    scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 15))+
+  theme_minimal()
+```
+
+```{r}
+model_A <- error_pred_gpt2_pos_brm
+model_B <- error_pred_kosmos2_pos_brm
+
+model_A_fixed <- tidy(model_A, effects = "fixed")
+
+# Extract fixed effects for model B
+model_B_fixed <- tidy(model_B, effects = "fixed")
+
+model_A_fixed$term[model_A_fixed$term == "gpt2_surp"] <- "surprisal"
+model_B_fixed$term[model_B_fixed$term == "kosmos2_surp"] <- "surprisal"
+
+combined_data <- rbind(
+  transform(model_A_fixed, model = "Model fitted with GPT2 surprisal"),
+  transform(model_B_fixed, model = "Model fitted with KOSMOS2 surprisal")
+)
+effects_of_interest <- c("Condition_ID.helm1:POS.helm1","Condition_ID.helm2:POS.helm1","Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","Condition_ID.helm1:POS.helm1","Condition_ID.helm2:POS.helm1","surprisal"), labels = c("Wrong vs no","Correct vs wrong&no mean","Change in facilitation in Wrong vs no for open POS","Change in facilitation in Correct vs wrong&no mean for open POS","1 unit increase in surprisal"))
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.4) +
+    geom_errorbar(aes(ymin = conf.low, ymax = conf.high), 
+                  position = position_dodge(width = 0.9), width = 0.2) +
+  #scale_x_discrete(guide = guide_axis(n.dodge=3))+
+  scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+    labs(x= "Effects", y = "Estimate & 95% CI of difference in the predicted log odds") +
+    theme_minimal()
+```
+
+#Dots & whiskers error prediction(groundedness)
+```{r}
+model_gpt2_groundedness <- tidy(error_pred_gpt2_groundedness_brm, effects="fixed")
+model_llama2_groundedness <- tidy(error_pred_llama2_groundedness_brm, effects = "fixed")
+model_blip2_groundedness <- tidy(error_pred_blip2_groundedness_brm, effects = "fixed")
+model_kosmos2_groundedness <- tidy(error_pred_kosmos2_groundedness_brm, effects = "fixed")
+model_llava_groundedness <- tidy(error_pred_llava_groundedness_brm, effects = "fixed")
+model_idefics_groundedness <- tidy(error_pred_idefics_groundedness_brm, effects = "fixed")
+
+
+model_gpt2_groundedness$term[model_gpt2_groundedness$term == "gpt2_surp"] <- "surprisal"
+model_llama2_groundedness$term[model_llama2_groundedness$term == "llama2_surp"] <- "surprisal"
+model_blip2_groundedness$term[model_blip2_groundedness$term == "blip2_surp"] <- "surprisal"
+model_kosmos2_groundedness$term[model_kosmos2_groundedness$term == "kosmos2_surp"] <- "surprisal"
+model_llava_groundedness$term[model_llava_groundedness$term == "llava_7b_surp"] <- "surprisal"
+model_idefics_groundedness$term[model_idefics_groundedness$term == "idefics_9b_surp"] <- "surprisal"
+
+model_gpt2_groundedness <- model_gpt2_groundedness %>% mutate(model_type="Text")
+model_llama2_groundedness <- model_llama2_groundedness %>% mutate(model_type="Text")
+model_blip2_groundedness <- model_blip2_groundedness %>% mutate(model_type="Multimodal")
+model_kosmos2_groundedness <- model_kosmos2_groundedness %>% mutate(model_type="Multimodal")
+model_llava_groundedness <- model_llava_groundedness %>% mutate(model_type="Multimodal")
+model_idefics_groundedness <- model_idefics_groundedness %>% mutate(model_type="Multimodal")
+
+combined_data <- rbind(
+  transform(model_gpt2_groundedness, model = "GPT2"),
+  transform(model_llama2_groundedness, model = "LLAMA2"),
+  transform(model_blip2_groundedness, model = "BLIP2"),
+  transform(model_kosmos2_groundedness, model = "KOSMOS2"),
+  transform(model_llava_groundedness, model = "LLAVA"),
+  transform(model_idefics_groundedness, model = "IDEFICS")
+  
+)
+
+effects_of_interest <- c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1:groundedness","Condition_ID.helm2:groundedness","surprisal"), labels = c("Wrong vs no for 1 unit increase in groundedness(ms/rating point)","Correct vs wrong&no mean for 1 unit increase in groundedness(ms/rating point)","surprisal(ms/bit)"))
+
+
+
+dwplot(filtered_data, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + xlab("Estimate & 95% CI of difference in the predicted log odds") + ylab("") + scale_y_discrete(labels = function(y) 
+    stringr::str_wrap(y, width = 15)) + theme_bw() + theme(axis.text=element_text(size=13))
+ggsave("Error_pred_groudedness.pdf")
+```
+
+#Dots & whiskers error prediction(POS)
+```{r}
+model_gpt2_pos <- tidy(error_pred_gpt2_pos_brm, effects="fixed")
+model_llama2_pos <- tidy(error_pred_llama2_pos_brm, effects = "fixed")
+model_blip2_pos <- tidy(error_pred_blip2_pos_brm, effects = "fixed")
+model_kosmos2_pos <- tidy(error_pred_kosmos2_pos_brm, effects = "fixed")
+model_llava_pos <- tidy(error_pred_llava_pos_brm, effects = "fixed")
+model_idefics_pos <- tidy(error_pred_idefics_pos_brm, effects = "fixed")
+
+model_gpt2_pos$term[model_gpt2_pos$term == "gpt2_surp"] <- "surprisal"
+model_llama2_pos$term[model_llama2_pos$term == "llama2_surp"] <- "surprisal"
+model_blip2_pos$term[model_blip2_pos$term == "blip2_surp"] <- "surprisal"
+model_kosmos2_pos$term[model_kosmos2_pos$term == "kosmos2_surp"] <- "surprisal"
+model_llava_pos$term[model_llava_pos$term == "llava_7b_surp"] <- "surprisal" 
+model_idefics_pos$term[model_idefics_pos$term == "idefics_9b_surp"] <- "surprisal" 
+
+model_gpt2_pos <- model_gpt2_pos %>% mutate(model_type="Text")
+model_llama2_pos <- model_llama2_pos %>% mutate(model_type="Text")
+model_blip2_pos <- model_blip2_pos %>% mutate(model_type="Multimodal")
+model_kosmos2_pos <- model_kosmos2_pos %>% mutate(model_type="Multimodal")
+model_llava_pos <- model_llava_pos %>% mutate(model_type="Multimodal")
+model_idefics_pos <- model_idefics_pos %>% mutate(model_type="Multimodal")
+
+combined_data <- rbind(
+  transform(model_gpt2_pos, model = "GPT2"),
+  transform(model_llama2_pos, model = "LLAMA2"),
+  transform(model_blip2_pos, model = "BLIP2"),
+  transform(model_kosmos2_pos, model = "KOSMOS2"),
+  transform(model_llava_pos, model="LLAVA"),
+  transform(model_idefics_pos, model="IDEFICS")
+  
+)
+
+effects_of_interest <- c("Condition_ID.helm1:POS.helm1","Condition_ID.helm2:POS.helm1","Condition_ID.helm1","Condition_ID.helm2","surprisal")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("Condition_ID.helm1","Condition_ID.helm2","Condition_ID.helm1:POS.helm1","Condition_ID.helm2:POS.helm1","surprisal"), labels = c("Wrong vs no(ms)","Correct vs wrong&no mean(ms)","Change in log likelihood in Wrong vs no for open POS(ms)","Change in log likelihood in Correct vs wrong&no mean for open POS(ms)","surprisal(ms/bit)"))
+
+dwplot(filtered_data, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + xlab("Estimate & 95% CI of difference in the predicted log odds") + ylab("") + scale_y_discrete(labels = function(y) 
+    stringr::str_wrap(y, width = 15)) + theme_bw() + theme(axis.text=element_text(size=15))
+ggsave("Error_pred_pos.pdf", height = 8, width = 10)
+```
+
+
+
+```{r}
+Pred_o <- predict(error_pred_gpt2_pos_brm, type = "response")
+Pred <- if_else(Pred_o[,1] > 0.013, 1, 0)
+conf_matrix <- table(Pred, pull(dataset_with_error, correctness)) #`pull` results in a vector
+
+sensitivity <- conf_matrix[2, 2] / sum(conf_matrix[,2])
+
+# Calculate specificity (true negative rate)
+specificity <- conf_matrix[1, 1] / sum(conf_matrix[,1])
+
+# Calculate balanced accuracy
+balanced_accuracy <- (sensitivity + specificity)/2
+balanced_accuracy
+```
+
+```{r}
+predicted_p <- fitted(error_pred_gpt2_pos_brm)
+
+predicted_ll <- ifelse(dataset_with_error$correctness == "correct",
+                       log(predicted_p),
+                       log(1 - predicted_p))
+
+# Combine predicted log likelihoods with class labels
+predicted_ll_df <- data.frame(predicted_ll, class = dataset_with_error$correctness)
+
+# Calculate mean and standard error for each class
+summary_stats <- aggregate(predicted_ll ~ class, data = predicted_ll_df, 
+                           FUN = function(x) c(mean = mean(x), se = sd(x)/sqrt(length(x))))
+
+```
+
+
+
+# Surprisal Difference(different types of surprisals) & groundedness
+
+In this section, I am trying to understand the relationship between surprisal difference and groundedness, between a mLLM and LLM, in the correct condition , because we want to see how the presence of an object in an image(or in other words groundedness) result in reduction in image-conditioned surprisal and if that relationship is linear. Assuming the relationship is linear(which could be relaxed later and we could fit a gam model), I have fit a lmer model below to see the if the linear relation is significant. What I found is that the relation is only significant when the words are open class words. I have fit several models witb maximal random effects structure(and commented out the ones that aren't as good) and suggesting the result from the best fit model. 
+
+
+```{r}
+dat_grounding_by_word_token
+```
+
+```{r}
+dataset_correct <- dataset_with_error %>% filter(correctness!='wrong')
+dat_grounding <- 
+  dataset_correct %>% 
+  filter(Condition_ID!="no") %>%
+  group_by(WordToken,Subject_ID,Group,Condition_ID) %>%
+  summarize(POS=POS[1],gpt2_surp=mean(gpt2_surp),kosmos2_surp=mean(kosmos2_surp),blip2_surp=mean(blip2_surp),llama2_surp=mean(llama2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT))
+
+dat_grounding_by_word_token <-
+  dat_grounding %>%
+  group_by(WordToken,Group,Condition_ID) %>%
+  summarize(POS=POS[1],gpt2_surp=mean(gpt2_surp),kosmos2_surp=mean(kosmos2_surp),blip2_surp=mean(blip2_surp),llama2_surp=mean(llama2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT)) %>%
+  mutate(kosmos2_gpt2_surp_diff=kosmos2_surp-gpt2_surp,
+         kosmos2_llama2_surp_diff = kosmos2_surp - llama2_surp,
+         blip2_gpt2_surp_diff = blip2_surp - gpt2_surp,
+         blip2_llama2_surp_diff = blip2_surp - llama2_surp,
+         `Part of Speech`=POS)
+
+#model_surp_diff <- lmer(kosmos2_gpt2_surp_diff ~ 1 + `Part of Speech`:groundedness +  Length + Frequency + (`Part of Speech`*groundedness +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'),REML=F)
+
+#model_surp_diff1 <- lmer(kosmos2_gpt2_surp_diff ~ 1 + `Part of Speech`:groundedness + groundedness + Length + Frequency + (`Part of Speech`*groundedness +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'),REML=F)
+
+model_surp_diff_kg <- lmer(kosmos2_gpt2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'),REML=F)
+
+model_surp_diff_kl <- lmer(kosmos2_llama2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'),REML=F)
+
+model_surp_diff_bl <- lmer(blip2_llama2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'),REML=F)
+
+model_surp_diff_bg <- lmer(blip2_gpt2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='correct'),REML=F)
+
+model_surp_diff_kg_w <- lmer(kosmos2_gpt2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='wrong'),REML=F)
+
+model_surp_diff_kl_w <- lmer(kosmos2_llama2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='wrong'),REML=F)
+
+model_surp_diff_bl_w <- lmer(blip2_llama2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='wrong'),REML=F)
+
+model_surp_diff_bg_w <- lmer(blip2_gpt2_surp_diff ~ 1 + `Part of Speech`/groundedness + `Part of Speech` + Length + Frequency + (`Part of Speech`/groundedness + `Part of Speech` +  Length + Frequency | Group) , filter(dat_grounding_by_word_token, Condition_ID=='wrong'),REML=F)
+```
+```{r}
+summary(model_surp_diff_bg)
+```
+
+```{r}
+
+dat_grounding_correct <- dat_grounding %>% filter(Condition_ID=='correct') %>% dplyr::select(-Condition_ID) 
+dat_grounding_correct
+
+ggplot(dat_grounding_correct, aes(gpt2_surp,kosmos2_surp)) +
+  geom_point(aes(color = groundedness)) +   xlim(c(0,20)) +
+  ylim(c(0,20)) + stat_smooth(method="lm") + coord_fixed() + scale_color_gradientn(colours = rainbow(2)) + geom_abline(color = "red") + xlab("GPT2 surprisal") + ylab("KOSMOS2 surprisal") + theme_bw()
+ggsave("img/kosmos_vs_gpt.pdf")
+```
+
+```{r}
+p1 <- ggplot(dat_grounding_by_word_token,aes(x=groundedness,y=blip2_gpt2_surp_diff,color=`Part of Speech`)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  coord_cartesian(ylim=c(-15,10)) +p
+ theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  ylab("BLIP2 surprisal - GPT2 surprisal") +
+  facet_grid(~Condition_ID) +  theme(legend.position = "none") +
+   annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4")
+
+p2 <- ggplot(dat_grounding_by_word_token,aes(x=groundedness,y=blip2_llama2_surp_diff,color=`Part of Speech`)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  
+  theme_bw() +
+  coord_cartesian(ylim=c(-15,10)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  ylab("BLIP2 surprisal - LLAMA2 surprisal") +
+  facet_grid(~Condition_ID) +  theme(strip.text.x = element_blank()) +  theme(legend.position = "none") + 
+   annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4")
+
+p3 <- ggplot(dat_grounding_by_word_token,aes(x=groundedness,y=kosmos2_llama2_surp_diff,color=`Part of Speech`)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme(strip.text.x = element_blank()) + 
+  theme_bw() +
+  coord_cartesian(ylim=c(-15,10)) +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  ylab("KOSMOS2 surprisal - LLAMA2 surprisal") +
+  facet_grid(~Condition_ID) + theme(strip.text.x = element_blank()) +  theme(legend.position = "none") + 
+   annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4")
+
+p4 <- ggplot(dat_grounding_by_word_token,aes(x=groundedness,y=kosmos2_gpt2_surp_diff,color=`Part of Speech`)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme(strip.text.x = element_blank()) + 
+  theme_bw() +
+  #lim(c(-10,10)) +
+  xlab("completely ungrounded     <-      neutral     ->      completely grounded\nGroundedness of Word in Correct Image") +
+  ylab("KOSMOS2 surprisal - GPT2 surprisal") +
+  coord_cartesian(ylim=c(-15,10)) +
+  facet_grid(~Condition_ID) + theme(strip.text.x = element_blank()) + 
+   annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4")
+```
+
+
+```{r}
+library(patchwork)
+p1/p2/p3/p4
+ggsave("plot_stacked.pdf",width=8,height=12)
+```
+
+```{r}
+dat_grounding_by_word_token
+```
+
+
+```{r}
+install.packages("ggpubr")
+library("ggpubr")
+
+annotations_type1 <- data.frame(
+  Condition_ID = "correct",
+  x = c(3, 1.5), # x positions for annotations
+  y = c(8, 8.25), # y positions for annotations
+  label = c("***", "ns"), # Labels for annotations
+  color = c("#F8766D", "#00BFC4") # Colors for annotations
+)
+
+annotations_type2 <- data.frame(
+  Condition_ID = "wrong",
+  x = c(4, 1.5), # x positions for annotations
+  y = c(8, 8.25), # y positions for annotations
+  label = c("***", "ns"), # Labels for annotations
+  color = c("#F8766D", "#00BFC4") # Colors for annotations
+)
+annotations <- rbind(annotations_type1, annotations_type2)
+custom_colors <- c("Open" = "#F8766D", "Closed" = "#00BFC4")
+label.df <- data.frame(groundedness = 3, blip2_gpt2_surp_diff = 8)
+ggplot(dat_grounding_by_word_token,aes(x=groundedness,y=blip2_gpt2_surp_diff, color= `Part of Speech`)) +
+  #scale_color_manual(values = custom_colors) + 
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  coord_cartesian(ylim=c(-15,10)) +
+ theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  ylab("BLIP2 surprisal - GPT2 surprisal") +
+  facet_grid(~Condition_ID) +  theme(legend.position = "bottom") + 
+  geom_text(data = annotations, aes(x = x, y = y, label = label, color = color), show.legend = F) 
+   #annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") +
+   #annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4") 
+
+```
+```{r}
+annotations
+```
+
+
+```{r}
+ggplot(dat_grounding_by_word_token,aes(x=groundedness,y=blip2_gpt2_surp_diff,color=`Part of Speech`)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  coord_cartesian(ylim=c(-15,10)) +
+ theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + 
+  ylab("BLIP2 surprisal - GPT2 surprisal") +
+  facet_grid(~Condition_ID) +  theme(legend.position = "none")
+```
+
+# Surprisal Difference (Same type) & groundedness
+In this section, I am trying the same, except that the surprisal difference here is coming from the same model(I am looking at the difference of surprisal between two conditions of kosmos2, correct - no and seeing how groundedness is predictive of this difference), which is still important to look at since in the previous analysis, there could be other factors related to training regime and training dataset or model paramater difference between two models that could be contribute to some aspects of the result.
+
+The approach to finding the best fitted model is the same as above, and the finding is the same as well, the effect of groundedness on surprisal difference is only strong for open class words.  
+
+```{r}
+dat_grounding <- 
+  dataset_correct %>%
+  group_by(WordToken,Subject_ID,Group,Condition_ID) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),llava_surp = mean(llava_7b_surp),idefics_surp = mean(idefics_9b_surp), Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT))
+
+dat_grounding_by_word_token <-
+  dat_grounding %>%
+  group_by(WordToken,Group,Condition_ID) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),llava_surp = mean(llava_surp),idefics_surp = mean(idefics_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT)) # %>%
+  #pivot_wider(names_from = Condition_ID, values_from = kosmos2_surp) ##%>%
+  #mutate(#groundedness=(10+groundedness)/2,
+         #kosmos2_surp_diff= wrong-correct,
+         #`Part of Speech`=POS)
+
+dat_grounding_by_word_token_correct <- dat_grounding_by_word_token %>% filter(Condition_ID=='correct') %>% dplyr::select(-Condition_ID) 
+dat_grounding_by_word_token_no <- dat_grounding_by_word_token %>% filter(Condition_ID=='no') %>% dplyr::select(-Condition_ID)
+dat_grounding_by_word_token_wrong <- dat_grounding_by_word_token %>% filter(Condition_ID=='wrong') %>% dplyr::select(-Condition_ID)
+
+combined_df_1 <- inner_join(dat_grounding_by_word_token_correct, dat_grounding_by_word_token_no, by = c("WordToken","Group","POS","groundedness","Frequency","Length")) %>%
+  mutate(kosmos2_surp_diff = kosmos2_surp.x - kosmos2_surp.y) %>%
+  mutate(blip2_surp_diff = blip2_surp.x - blip2_surp.y) %>%
+  mutate(llava_surp_diff = llava_surp.x - llava_surp.y) %>%
+  mutate(idefics_surp_diff = idefics_surp.x - idefics_surp.y) %>%
+  mutate(RT_diff = RT.x - RT.y) %>%
+  dplyr::select(-starts_with("kosmos2_surp.")) %>%
+  dplyr::select(-starts_with("blip2_surp.")) %>%
+  dplyr::select(-starts_with("llava_surp.")) %>%
+  dplyr::select(-starts_with("idefics_surp.")) %>%
+  dplyr::select(-starts_with("RT.")) %>%
+  mutate(comparison="Correct Relative to No")
+  
+
+
+combined_df_2 <- inner_join(dat_grounding_by_word_token_wrong, dat_grounding_by_word_token_no, by = c("WordToken","Group","POS","groundedness","Frequency","Length")) %>%
+  mutate(kosmos2_surp_diff = kosmos2_surp.x - kosmos2_surp.y) %>%
+  mutate(blip2_surp_diff = blip2_surp.x - blip2_surp.y) %>%
+  mutate(llava_surp_diff = llava_surp.x - llava_surp.y) %>%
+  mutate(idefics_surp_diff = idefics_surp.x - idefics_surp.y) %>%
+  mutate(RT_diff = RT.x - RT.y) %>%
+  dplyr::select(-starts_with("kosmos2_surp.")) %>%
+  dplyr::select(-starts_with("blip2_surp.")) %>%
+  dplyr::select(-starts_with("RT.")) %>% 
+  mutate(comparison = "Wrong Relative to No")
+
+combined_df <- rbind(combined_df_1,combined_df_2)
+
+
+p1 <- ggplot(combined_df,aes(x=groundedness,y=kosmos2_surp_diff,color=POS)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  xlim(c(-5,10)) +
+  coord_cartesian(ylim=c(-15,10)) + 
+  xlab("") +
+  ylab("KOSMOS2 surprisal difference") +
+  facet_grid(~comparison) + 
+   annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4") + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + theme(legend.position = "none")
+
+p2 <- ggplot(combined_df,aes(x=groundedness,y=blip2_surp_diff,color=POS)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  xlim(c(-5,10)) +
+  coord_cartesian(ylim=c(-15,10)) + 
+  xlab("") +
+  ylab("BLIP2 surprisal difference") +
+  facet_grid(~comparison) + theme(strip.text.x = element_blank()) +
+  annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4") + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + theme(legend.position = "none")
+
+p3 <- ggplot(combined_df,aes(x=groundedness,y=llava_surp_diff,color=POS)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  xlim(c(-5,10)) +
+  coord_cartesian(ylim=c(-15,10)) + 
+  xlab("") +
+  ylab("LLAVA surprisal difference") +
+  facet_grid(~comparison) + theme(strip.text.x = element_blank()) +
+  annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4") + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + theme(legend.position = "none")
+
+p4 <- ggplot(combined_df,aes(x=groundedness,y=idefics_surp_diff,color=POS)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  xlim(c(-5,10)) +
+  coord_cartesian(ylim=c(-15,10)) + 
+  xlab("Groundedness in Correct Image") +
+  ylab("IDEFICS surprisal difference") +
+  theme(legend.position = "bottom") + 
+  facet_grid(~comparison) + theme(strip.text.x = element_blank()) +
+  annotate(geom="text",x=3, y = 8, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 8.25, label = "ns", color = "#00BFC4")
+
+
+
+#model_surp_diff_same <- lmer(kosmos2_surp_diff ~ 1 + POS:groundedness +  Length + Frequency + (POS*groundedness +  Length + Frequency | Group) , data=combined_df,REML=F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+#model_surp_diff_same1 <- lmer(kosmos2_surp_diff ~ 1 + POS*groundedness +  Length + Frequency + (POS*groundedness + Length + Frequency | Group) , data=combined_df, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+model_surp_diff_kosmos2_cn <- lmer(kosmos2_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_1, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+
+model_surp_diff_kosmos2_wn <- lmer(kosmos2_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_2, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+
+model_surp_diff_blip2_cn <- lmer(blip2_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_1, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+
+model_surp_diff_blip2_wn <- lmer(blip2_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_2, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+model_surp_diff_llava_cn <- lmer(llava_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_1, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+model_surp_diff_llava_wn <- lmer(llava_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_2, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+
+model_surp_diff_idefics_cn <- lmer(idefics_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_1, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+
+model_surp_diff_idefics_wn <- lmer(idefics_surp_diff ~ 1 + POS + POS:groundedness +  Length + Frequency + (POS + POS:groundedness + Length + Frequency | Group) , data=combined_df_2, REML = F, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)))
+
+```
+
+
+
+```{r}
+library(patchwork)
+p1/p2/p3/p4
+ggsave("plot_stacked2.pdf",width=6,height=9.4)
+```
+
+
+```{r}
+summary(model_surp_diff_kosmos2_cn)
+summary(model_surp_diff_kosmos2_wn)
+summary(model_surp_diff_blip2_cn)
+summary(model_surp_diff_blip2_wn)
+```
+
+
+```{r}
+ggplot(combined_df_1, aes(RT.x,RT.y)) +
+  geom_point(aes(color = groundedness)) +   xlim(c(500,1500)) +
+  ylim(c(500,1500)) + geom_abline(slope=1, intercept = 0) + coord_fixed() + 
+  scale_color_gradientn(colours = rainbow(2))
+```
+
+
+```{r}
+dat_grounding <- 
+  dataset_correct %>%
+  group_by(Word,Subject_ID,Group,Condition_ID) %>% 
+  group_by(Word,Group,Condition_ID) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT))
+open <- dat_grounding %>% filter(POS=="Open")
+closed <- dat_grounding %>% filter(POS=="Closed")
+ggplot(open, aes(x = open$groundedness)) +
+  geom_histogram() + xlab("Groundedness Rating") + ylab("Frequency") + theme_bw() + xlim(-10,10)
+ggsave("img/open_hist.pdf")
+ggplot(closed, aes(x = closed$groundedness)) +
+  geom_histogram() + xlab("Groundedness Rating") + ylab("Frequency") + theme_bw() + xlim(-10,10)
+ggsave("img/closed_hist.pdf")
+```
+
+
+# RT facilitation & surprisal, groundedness
+```{r}
+dat_grounding <- 
+  dataset_correct %>%
+  group_by(WordToken,Subject_ID,Group,Condition_ID) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT))
+
+dat_grounding_by_word_token <-
+  dat_grounding %>%
+  group_by(WordToken,Group,Condition_ID) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT)) # %>%
+  #pivot_wider(names_from = Condition_ID, values_from = kosmos2_surp) ##%>%
+  #mutate(#groundedness=(10+groundedness)/2,
+         #kosmos2_surp_diff= wrong-correct,
+         #`Part of Speech`=POS)
+
+dat_grounding_by_word_token_correct <- dat_grounding_by_word_token %>% filter(Condition_ID=='correct') %>% dplyr::select(-Condition_ID) 
+dat_grounding_by_word_token_no <- dat_grounding_by_word_token %>% filter(Condition_ID=='no') %>% dplyr::select(-Condition_ID)
+dat_grounding_by_word_token_wrong <- dat_grounding_by_word_token %>% filter(Condition_ID=='wrong') %>% dplyr::select(-Condition_ID)
+
+combined_df_1 <- inner_join(dat_grounding_by_word_token_correct, dat_grounding_by_word_token_no, by = c("WordToken","Group","POS","groundedness","Frequency","Length")) %>%
+  mutate(kosmos2_surp_diff = kosmos2_surp.x - kosmos2_surp.y) %>%
+  mutate(blip2_surp_diff = blip2_surp.x - blip2_surp.y) %>%
+  mutate(RT_diff = RT.x - RT.y) %>%
+  dplyr::select(-starts_with("kosmos2_surp.")) %>%
+  dplyr::select(-starts_with("blip2_surp.")) %>%
+  dplyr::select(-starts_with("RT.")) %>%
+  mutate(comparison="Correct Relative to No")
+  
+
+
+combined_df_2 <- inner_join(dat_grounding_by_word_token_correct, dat_grounding_by_word_token_wrong, by = c("WordToken","Group","POS","groundedness","Frequency","Length")) %>%
+  mutate(kosmos2_surp_diff = kosmos2_surp.x - kosmos2_surp.y) %>%
+  mutate(blip2_surp_diff = blip2_surp.x - blip2_surp.y) %>%
+  mutate(RT_diff = RT.x - RT.y) %>%
+  dplyr::select(-starts_with("kosmos2_surp.")) %>%
+  dplyr::select(-starts_with("blip2_surp.")) %>%
+  dplyr::select(-starts_with("RT.")) %>% 
+  mutate(comparison = "Correct Relative to Wrong")
+
+combined_df <- rbind(combined_df_1,combined_df_2)
+
+
+ggplot(combined_df,aes(x=groundedness,y=RT_diff,color=POS)) +
+  geom_point(alpha=0.2) +
+  stat_smooth(method="lm") + 
+  theme_bw() +
+  xlim(c(-5,10)) +
+  coord_cartesian(ylim=c(-1000,1000)) + 
+  xlab("") +
+  ylab("Reading Time Advantage") +
+  theme(legend.position = "bottom") + 
+  facet_grid(~comparison) + 
+   annotate(geom="text",x=3, y = 1000, label = "***", color = "#F8766D") + 
+   annotate(geom="text",x=1.5, y = 1000, label = "ns", color = "#00BFC4") + 
+  xlab("completely ungrounded     <-      neutral     ->      completely grounded\nGroundedness of Word in Correct Image") 
+
+ggsave("RT_advantage.pdf",height=6,width=8)
+```
+
+
+
+```{r}
+model_RT_diff_kosmos2_cn <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + kosmos2_surp_diff + (Frequency + Length + POS:groundedness + kosmos2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to No")) 
+model_RT_diff_kosmos2_cw <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + kosmos2_surp_diff + (Frequency + Length + POS:groundedness + kosmos2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to Wrong")) 
+
+model_RT_diff_blip2_cn <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + blip2_surp_diff + (Frequency + Length + POS:groundedness + blip2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to No")) 
+model_RT_diff_blip2_cw <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + blip2_surp_diff + (Frequency + Length + POS:groundedness + blip2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to Wrong")) 
+
+model_RT_diff_llava_cn <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + kosmos2_surp_diff + (Frequency + Length + POS:groundedness + kosmos2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to No")) 
+model_RT_diff_kosmos2_cw <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + kosmos2_surp_diff + (Frequency + Length + POS:groundedness + kosmos2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to Wrong")) 
+
+model_RT_diff_blip2_cn <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + blip2_surp_diff + (Frequency + Length + POS:groundedness + blip2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to No")) 
+model_RT_diff_blip2_cw <- lmer(RT_diff ~ Frequency + Length + POS:groundedness + blip2_surp_diff + (Frequency + Length + POS:groundedness + blip2_surp_diff | Group),data=combined_df %>% filter(comparison=="Correct Relative to Wrong")) 
+```
+
+```{r}
+summary(model_RT_diff_kosmos2_cn)
+summary(model_RT_diff_kosmos2_cw)
+summary(model_RT_diff_blip2_cn)
+summary(model_RT_diff_blip2_cw)
+```
+
+```{r}
+model_RT_diff_kosmos2_cn_fixed <- tidy(model_RT_diff_kosmos2_cn, effects = "fixed")
+model_RT_diff_kosmos2_cw_fixed <- tidy(model_RT_diff_kosmos2_cw, effects = "fixed")
+model_RT_diff_blip2_cn_fixed <- tidy(model_RT_diff_blip2_cn, effects = "fixed")
+model_RT_diff_blip2_cw_fixed <- tidy(model_RT_diff_blip2_cw, effects = "fixed")
+
+
+model_RT_diff_kosmos2_cn_fixed$term[model_RT_diff_kosmos2_cn_fixed$term == "kosmos2_surp_diff"] <- "Surprisal difference"
+model_RT_diff_kosmos2_cw_fixed$term[model_RT_diff_kosmos2_cw_fixed$term == "kosmos2_surp_diff"] <- "Surprisal difference"
+model_RT_diff_blip2_cn_fixed$term[model_RT_diff_blip2_cn_fixed$term == "blip2_surp_diff"] <- "Surprisal difference"
+model_RT_diff_blip2_cw_fixed$term[model_RT_diff_blip2_cw_fixed$term == "blip2_surp_diff"] <- "Surprisal difference"
+
+combined_data <- rbind(
+  transform(model_RT_diff_kosmos2_cn_fixed, model = "KOSMOS2", type = "Correct Relative to No"),
+  transform(model_RT_diff_kosmos2_cw_fixed, model = "KOSMOS2", type = "Correct Relative to Wrong"),
+  transform(model_RT_diff_blip2_cn_fixed, model = "BLIP2", type = "Correct Relative to No"),
+  transform(model_RT_diff_blip2_cw_fixed, model = "BLIP2", type = "Correct Relative to Wrong")
+)
+effects_of_interest <- c("POSOpen:groundedness","POSClosed:groundedness","Surprisal difference")
+filtered_data <- combined_data %>% 
+  filter(term %in% effects_of_interest)
+
+filtered_data$term <- factor(filtered_data$term)
+
+filtered_data$term <- factor(filtered_data$term, levels = c("POSOpen:groundedness","POSClosed:groundedness", "Surprisal difference"), labels = c("Groundedness for Open Class words","Groundedness for Closed class words", "Surprisal difference"))
+
+
+ggplot(filtered_data, aes(x = term, y = estimate, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.4) +
+  geom_errorbar(aes(ymin = estimate - 1.97*std.error, ymax = estimate + 1.97*std.error), 
+                position = position_dodge(width = 0.9), width = 0.2) +
+  labs(x = "", y = "Estimate & 95% CI in predicting RT difference") +
+    scale_x_discrete(labels = function(x) 
+    stringr::str_wrap(x, width = 10))+
+  theme_minimal() + facet_wrap(~type)
+```
+
+```{r}
+combined_data
+```
+
+```{r}
+# Define your sentence
+sentence <- "The quick brown fox jumps over the lazy dog"
+
+# Define your functions f1 and f2
+f1 <- function(word) {
+  # Example function, you can replace it with your own
+  return(nchar(word))  # Return the length of the word
+}
+
+f2 <- function(word) {
+  # Example function, you can replace it with your own
+  return(2 * nchar(word))  # Return twice the length of the word
+}
+
+# Tokenize the sentence into words
+words <- strsplit(sentence, " ")[[1]]
+
+# Apply f1 and f2 to each word
+values_f1 <- sapply(words, f1)
+values_f2 <- sapply(words, f2)
+
+# Create a plot
+plot(1:length(words), values_f1, type = "l", col = "blue", xaxt = 'n', xlab = "Words", ylab = "Values", ylim = range(c(values_f1, values_f2)))
+lines(1:length(words), values_f2, type = "l", col = "red")
+axis(1, at = 1:length(words), labels = words, las = 2)
+legend("topright", legend = c("f1", "f2"), col = c("blue", "red"), lty = 1)
+
+# Add a title
+title("Values of f1 and f2 for each word in the sentence")
+
+```
+
+
+
+# Perplexity vs log likelihood difference plots (across conditions)
+
+```{r}
+without_surp_correct <- lmer(RT ~ POS.sum + Frequency + Length + (1 | Word) + (1 | WordToken) + (1 | Group) + (1 | Subject_ID), data = correct_data, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+
+without_surp_no <- lmer(RT ~  POS.sum + Frequency + Length + (1 | Word) + (1 | WordToken) + (1 | Group) + (1 | Subject_ID), data = no_data, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+
+without_surp_wrong <- lmer(RT ~  POS.sum + Frequency + Length + (1 | Word) + (1 | WordToken) + (1 | Group) + (1 | Subject_ID), data = wrong_data, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+
+without_surp_all <- lmer(RT ~  Condition_ID.helm*POS.sum + Frequency + Length + (1 | Word) + (1 | WordToken) + (1 | Group) + (1 | Subject_ID), data = dataset_cons, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+
+
+conditions <- c("correct", "no", "wrong")
+datasets <- list(correct_data, no_data, wrong_data)
+
+# List of predictors
+predictors <- c("gpt2_surp", "llama2_surp", "blip2_surp", "kosmos2_surp", "llava_7b_surp", "idefics_9b_surp")
+
+
+# Function to fit models for each predictor and condition
+fit_models <- function(predictor, data) {
+  # Construct the formula for the model
+  formula <- as.formula(paste("RT ~", predictor, "+ POS.sum + Frequency + Length + groundedness +  (1 | WordToken) + (1 | Group) + (1 | Subject_ID)  + (1| Word)"))
+  print(formula)
+  # Fit the model using lmer
+  model <- lmer(formula, data = data, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+  
+  return(model)
+}
+
+fit_all_condition_models <- function(predictor, data) {
+  # Construct the formula for the model
+  formula <- as.formula(paste("RT ~", predictor, "+ Condition_ID.helm*POS.sum + Frequency + Length + groundedness +  (1 | WordToken) + (1 | Group) + (1 | Subject_ID)  + (1| Word)"))
+  print(formula)
+  # Fit the model using lmer
+  model <- lmer(formula, data = data, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+  
+  return(model)
+}
+
+models <- list()
+log_likelihood <- list()
+for (predictor in predictors) {
+  for (i in 1: length(conditions)) {
+    models[[paste(predictor, conditions[i], sep = "_")]] <- fit_models(predictor, datasets[[i]])
+    log_likelihood[[paste(predictor, conditions[i], sep = "_")]] <- logLik(models[[paste(predictor, conditions[i], sep = "_")]])
+  }
+}
+
+for (predictor in predictors) {
+  models[[predictor]] <- fit_all_condition_models(predictor,dataset_cons)
+  log_likelihood[[predictor]] <- logLik(models[[predictor]])
+}
+
+log_likelihood[["without_surp_correct"]] <- logLik(without_surp_correct)
+log_likelihood[["without_surp_no"]] <- logLik(without_surp_no)
+log_likelihood[["without_surp_wrong"]] <- logLik(without_surp_wrong)
+log_likelihood[["without_surp_all"]] <- logLik(without_surp_all)
+#Calculating Perplexity 
+
+
+unique_sentences <- unique(dataset_with_error$Sentence)
+
+# Calculate the total number of words combining all sentences
+total_words <- sum(lengths(strsplit(unique_sentences, "\\s+"))-1)
+
+perplexity_stuff <- dataset_with_error %>% filter(correctness=="correct") %>% group_by(Condition_ID,Sentence,Subject_ID) %>% summarize(gpt2_perplexity= mean(gpt2_perplexity), llama2_perplexity = mean(llama2_perplexity),blip2_perplexity=mean(blip2_perplexity),kosmos2_perplexity=mean(kosmos2_perplexity),llava_7b_perplexity=mean(llava_7b_perplexity),idefics_9b_perplexity=mean(idefics_9b_perplexity)) %>% group_by(Condition_ID,Sentence,) %>% summarize(gpt2_perplexity= mean(gpt2_perplexity), llama2_perplexity = mean(llama2_perplexity),blip2_perplexity=mean(blip2_perplexity),kosmos2_perplexity=mean(kosmos2_perplexity),llava_7b_perplexity=mean(llava_7b_perplexity),idefics_9b_perplexity=mean(idefics_9b_perplexity)) %>% mutate(sent_length = lengths(strsplit(Sentence, " "))-1)
+
+correct_perplexity <- perplexity_stuff %>% filter(Condition_ID == "correct")
+wrong_perplexity <- perplexity_stuff %>% filter(Condition_ID == "wrong")
+no_perplexity <- perplexity_stuff %>% filter(Condition_ID == "no")
+
+
+gpt2_correct_perplexity <- sum(correct_perplexity$sent_length * log2(correct_perplexity$gpt2_perplexity))/sum(correct_perplexity$sent_length)
+llama2_correct_perplexity <- sum(correct_perplexity$sent_length * log2(correct_perplexity$llama2_perplexity))/sum(correct_perplexity$sent_length)
+blip2_correct_perplexity <- sum(correct_perplexity$sent_length * log2(correct_perplexity$blip2_perplexity))/sum(correct_perplexity$sent_length)
+kosmos2_correct_perplexity <- sum(correct_perplexity$sent_length * log2(correct_perplexity$kosmos2_perplexity))/sum(correct_perplexity$sent_length)
+llava_7b_correct_perplexity <- sum(correct_perplexity$sent_length * log2(correct_perplexity$llava_7b_perplexity))/sum(correct_perplexity$sent_length)
+idefics_9b_correct_perplexity <- sum(correct_perplexity$sent_length * log2(correct_perplexity$idefics_9b_perplexity))/sum(correct_perplexity$sent_length)
+
+gpt2_no_perplexity <- sum(no_perplexity$sent_length * log2(no_perplexity$gpt2_perplexity))/sum(correct_perplexity$sent_length)
+llama2_no_perplexity <- sum(no_perplexity$sent_length * log2(no_perplexity$llama2_perplexity))/sum(correct_perplexity$sent_length)
+blip2_no_perplexity <- sum(no_perplexity$sent_length * log2(no_perplexity$blip2_perplexity))/sum(correct_perplexity$sent_length)
+kosmos2_no_perplexity <- sum(no_perplexity$sent_length * log2(no_perplexity$kosmos2_perplexity))/sum(correct_perplexity$sent_length)
+llava_7b_no_perplexity <- sum(no_perplexity$sent_length * log2(no_perplexity$llava_7b_perplexity))/sum(correct_perplexity$sent_length)
+idefics_9b_no_perplexity <- sum(no_perplexity$sent_length * log2(no_perplexity$idefics_9b_perplexity))/sum(correct_perplexity$sent_length)
+
+gpt2_wrong_perplexity <- sum(wrong_perplexity$sent_length * log2(wrong_perplexity$gpt2_perplexity))/sum(correct_perplexity$sent_length)
+llama2_wrong_perplexity <- sum(wrong_perplexity$sent_length * log2(wrong_perplexity$llama2_perplexity))/sum(correct_perplexity$sent_length)
+blip2_wrong_perplexity <- sum(wrong_perplexity$sent_length * log2(wrong_perplexity$blip2_perplexity))/sum(correct_perplexity$sent_length)
+kosmos2_wrong_perplexity <- sum(wrong_perplexity$sent_length * log2(wrong_perplexity$kosmos2_perplexity))/sum(correct_perplexity$sent_length)
+llava_7b_wrong_perplexity <- sum(wrong_perplexity$sent_length * log2(wrong_perplexity$llava_7b_perplexity))/sum(correct_perplexity$sent_length)
+idefics_9b_wrong_perplexity <- sum(wrong_perplexity$sent_length * log2(wrong_perplexity$idefics_9b_perplexity))/sum(correct_perplexity$sent_length)
+
+gpt2_all_perplexity <- (total_words*gpt2_correct_perplexity + total_words*gpt2_no_perplexity + total_words*gpt2_wrong_perplexity)/(3*total_words)
+llama2_all_perplexity <- (total_words*llama2_correct_perplexity + total_words*llama2_no_perplexity + total_words*llama2_wrong_perplexity)/(3*total_words)
+blip2_all_perplexity <- (total_words*blip2_correct_perplexity + total_words*blip2_no_perplexity + total_words*blip2_wrong_perplexity)/(3*total_words)
+kosmos2_all_perplexity <- (total_words*kosmos2_correct_perplexity + total_words*kosmos2_no_perplexity + total_words*kosmos2_wrong_perplexity)/(3*total_words)
+llava_7b_all_perplexity <- (total_words*llava_7b_correct_perplexity + total_words*llava_7b_no_perplexity + total_words*llava_7b_wrong_perplexity)/(3*total_words)
+idefics_9b_all_perplexity <- (total_words*idefics_9b_correct_perplexity + total_words*idefics_9b_no_perplexity + total_words*idefics_9b_wrong_perplexity)/(3*total_words)
+
+
+perplexity <- c(2**gpt2_correct_perplexity,2**llama2_correct_perplexity,2**blip2_correct_perplexity,2**kosmos2_correct_perplexity,2**llava_7b_correct_perplexity,2**idefics_9b_correct_perplexity,2**gpt2_no_perplexity,2**llama2_no_perplexity,2**blip2_no_perplexity,2**kosmos2_no_perplexity,2**llava_7b_no_perplexity,2**idefics_9b_no_perplexity,2**gpt2_wrong_perplexity,2**llama2_wrong_perplexity,2**blip2_wrong_perplexity,2**kosmos2_wrong_perplexity,2**llava_7b_wrong_perplexity,2**idefics_9b_wrong_perplexity)
+
+perplexity_all <- c(2**gpt2_all_perplexity, 2**llama2_all_perplexity, 2**blip2_all_perplexity, 2**kosmos2_all_perplexity, 2**llava_7b_all_perplexity, 2**idefics_9b_all_perplexity)
+
+log_likelihood_diff <- list()
+log_likelihood_diff_all <- list()
+
+  
+ for (i in 1: length(conditions)) {
+   for (predictor in predictors) {
+
+    log_likelihood_diff[[paste(predictor, conditions[i], sep = "_")]] <- log_likelihood[[paste(predictor, conditions[i], sep = "_")]] - log_likelihood[[paste("without_surp", conditions[i], sep = "_")]]
+  }
+ }
+
+for (predictor in predictors) {
+  log_likelihood_diff_all[predictor] <- log_likelihood[[predictor]] - log_likelihood[["without_surp_all"]]
+}
+```
+
+We can finally plot!!
+```{r}
+data = data.frame(
+  log_likelihood_diff = unlist(log_likelihood_diff),
+  perplexity = perplexity,
+  condition = c("correct","correct","correct","correct","correct","correct","no","no","no","no","no","no","wrong","wrong","wrong","wrong","wrong","wrong"),
+  Model = c("GPT2","LLAMA2","BLIP2","KOSMOS2","LLAVA","IDEFICS","GPT2","LLAMA2","BLIP2","KOSMOS2","LLAVA","IDEFICS","GPT2","LLAMA2","BLIP2","KOSMOS2","LLAVA","IDEFICS"),
+  Type = c("Text","Text","Multimodal","Multimodal","Multimodal","Multimodal","Text","Text","Multimodal","Multimodal","Multimodal","Multimodal","Text","Text","Multimodal","Multimodal","Multimodal","Multimodal")
+)
+
+ggplot(data, aes(x = perplexity, y = log_likelihood_diff, color = Type,shape=Model)) +
+  facet_wrap(~condition) + 
+  geom_point() + theme_bw() + 
+  labs(x = "Perplexity", y = "Log Likelihood Difference") 
+ggsave("img/log_likelihood_diff_vs_perplexity.pdf")
+f```
+```{r}
+perplexity_all
+```
+
+
+```{r}
+data = data.frame(
+  log_likelihood_diff_all = unlist(log_likelihood_diff_all),
+  perplexity = perplexity_all,
+  Model = c("GPT2","LLAMA2","BLIP2","KOSMOS2","LLAVA","IDEFICS"),
+  Type = c("Text","Text","Multimodal","Multimodal","Multimodal","Multimodal")
+)
+
+ggplot(data, aes(x = perplexity, y = log_likelihood_diff_all, color = Type,shape=Model)) +
+  geom_point() + theme_bw() + 
+  labs(x = "Perplexity", y = "Log Likelihood Difference") 
+ggsave("img/log_likelihood_diff_vs_perplexity_all.pdf")
+```
+
+
+
+# Previous word predictor contribution across conditions stuff (RT prediction models only, for both pos and groudness I think?)
+
+```{r}
+
+shift_column <- function(x) {
+  c(NA, head(x, -1))
+}
+
+dataset_with_error <- dataset_with_error %>%
+  group_by(Sentence) %>%
+  mutate(prev_Frequency = shift_column(Frequency)) %>%
+  mutate(prev_Length = shift_column(Length)) %>%
+  mutate(prev_groundedness = shift_column(groundedness)) %>%
+  mutate(prev_gpt2_surp = shift_column(gpt2_surp)) %>%
+  mutate(prev_llama2_surp = shift_column(llama2_surp)) %>%
+  mutate(prev_blip2_surp = shift_column(blip2_surp)) %>%
+  mutate(prev_kosmos2_surp = shift_column(kosmos2_surp))%>%
+  mutate(prev_idefics_9b_surp = shift_column(idefics_9b_surp))%>%
+  mutate(prev_llava_7b_surp = shift_column(llava_7b_surp)) %>%
+  
+
+
+dataset_prev <- dataset_with_error %>%  filter(!if_any(-image_id, is.na))
+
+correct_prev_data <- dataset_prev %>% filter(correctness=="correct") %>% filter(Condition_ID=="correct")
+no_prev_data <- dataset_prev %>% filter(correctness=="correct") %>% filter(Condition_ID=="no")
+wrong_prev_data <- dataset_prev %>% filter(correctness=="correct") %>% filter(Condition_ID=="wrong")
+```
+
+
+```{r}
+conditions <- c("correct", "wrong", "no")
+datasets <- list(correct_prev_data, wrong_prev_data, no_prev_data)
+
+# List of predictors
+predictors <- c("gpt2_surp", "llama2_surp", "blip2_surp", "kosmos2_surp", "llava_7b_surp", "idefics_9b_surp")
+
+# Function to fit models for each predictor and condition
+fit_models <- function(predictor, data) {
+  # Construct the formula for the model
+  formula <- as.formula(paste("RT ~", predictor, sprintf(" + prev_%s",predictor), "+ Frequency + Length + groundedness + prev_freq + prev_length + prev_groundedness + (1 | WordToken) + (1 | Group) + (1 | Subject_ID)  + (1| Word)"))
+  print(formula)
+  # Fit the model using lmer
+  model <- lmer(formula, data = data, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+  
+  return(model)
+}
+
+models <- list()
+for (predictor in predictors) {
+  for (i in 1: length(conditions)) {
+    models[[paste(sprintf("prev_%s",predictor), conditions[i], sep = "_")]] <- fit_models(predictor, datasets[[i]])
+  }
+}
+```
+
+Now doing some preprocessing to make plots  
+```{r}
+model_post <- function(model,name_string){
+  
+  model_fixed <- tidy(model,effects="fixed")%>% mutate(predictor_type = ifelse(grepl("^prev", term), "previous", "current")) %>% mutate(term = ifelse(grepl("surp$", term), "Surprisal", term))
+  model_fixed$term[model_fixed$term == "prev_freq"] <- "Frequency"
+  model_fixed$term[model_fixed$term == "prev_length"] <- "Length"
+  model_fixed$term[model_fixed$term == "prev_groundedness"] <- "groundedness"
+  if (name_string=="gpt" | name_string=="llama"){
+    model_fixed <- model_fixed %>% mutate(model_type="Text")
+  }
+  else {
+    model_fixed <- model_fixed  %>% mutate(model_type="Multimodal")
+  }
+  model_fixed <- switch(name_string,
+                        "gpt" = model_fixed %>% mutate(model="GPT2"),
+                        "llama" = model_fixed %>% mutate(model="LLAMA2"),
+                        "blip" = model_fixed %>% mutate(model="BLIP2"),
+                        "kosmos" = model_fixed %>% mutate(model="KOSMOS2"), 
+                        "llava" = model_fixed %>% mutate(model="LLAVA"),
+                        "idefics" = model_fixed %>% mutate(model="IDEFICS"))
+  return(model_fixed)
+}
+
+combined_model_condition <- function(condition){
+ if (condition=="correct"){
+   combined_data <- rbind(model_post(models$prev_gpt2_surp_correct,"gpt"),
+                          model_post(models$prev_llama2_surp_correct,"llama"),
+                          model_post(models$prev_blip2_surp_correct,"blip"),
+                          model_post(models$prev_kosmos2_surp_correct,"kosmos"),
+                          model_post(models$prev_llava_7b_surp_correct,"llava"),
+                          model_post(models$prev_idefics_9b_surp_correct,"idefics"))
+ } else if (condition == "wrong") {
+   combined_data <- rbind(model_post(models$prev_gpt2_surp_wrong,"gpt"),
+                          model_post(models$prev_llama2_surp_wrong,"llama"),
+                          model_post(models$prev_blip2_surp_wrong,"blip"),
+                          model_post(models$prev_kosmos2_surp_wrong,"kosmos"),
+                          model_post(models$prev_llava_7b_surp_wrong,"llava"),
+                          model_post(models$prev_idefics_9b_surp_wrong,"idefics"))
+ } else {
+   combined_data <- rbind(model_post(models$prev_gpt2_surp_no,"gpt"),
+                          model_post(models$prev_llama2_surp_no,"llama"),
+                          model_post(models$prev_blip2_surp_no,"blip"),
+                          model_post(models$prev_kosmos2_surp_no,"kosmos"),
+                          model_post(models$prev_llava_7b_surp_no,"llava"),
+                          model_post(models$prev_idefics_9b_surp_no,"idefics"))
+ }
+ return(combined_data)
+}
+
+combined_correct <- combined_model_condition("correct")
+combined_no <- combined_model_condition("no")
+combined_wrong <- combined_model_condition("wrong")
+```
+
+Finally drawing the plots 
+
+```{r}
+library(dotwhisker)
+
+p1 <- dwplot(combined_correct ,ci=.95, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + xlab("") + ylab("Correct") +
+    ggtitle("") + scale_y_discrete(labels = function(y) 
+   stringr::str_wrap(y, width = 10)) + facet_wrap(~predictor_type) + theme_bw() +  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + theme(legend.position = "none")
+
+p2<- dwplot(combined_wrong ,ci=.95, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + xlab("") + ylab("Wrong") + 
+    ggtitle("") + scale_y_discrete(labels = function(y) 
+   stringr::str_wrap(y, width = 10)) + facet_wrap(~predictor_type) + theme_bw() +  theme(strip.text.x = element_blank())  + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) 
+
+p3<- dwplot(combined_no ,ci=.95, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + xlab("") + ylab("No") +
+    ggtitle("") + scale_y_discrete(labels = function(y) 
+   stringr::str_wrap(y, width = 10)) +  facet_wrap(~predictor_type) + theme_bw() + theme(strip.text.x = element_blank()) + theme(legend.position = "none") 
+library(patchwork)
+p1/p2/p3
+ggsave("plot_spillover.pdf",width=6,height=8)
+```
+# Overall no spillover graph
+```{r}
+shift_column <- function(x) {
+  c(NA, head(x, -1))
+}
+
+dataset_with_prev <- dataset_with_error %>% filter(correctness=="correct") %>%
+  group_by(Sentence) %>%
+  mutate(prev_Frequency = shift_column(Frequency)) %>%
+  mutate(prev_Length = shift_column(Length)) %>%
+  mutate(prev_groundedness = shift_column(groundedness)) %>%
+  mutate(prev_gpt2_surp = shift_column(gpt2_surp)) %>%
+  mutate(prev_llama2_surp = shift_column(llama2_surp)) %>%
+  mutate(prev_blip2_surp = shift_column(blip2_surp)) %>%
+  mutate(prev_kosmos2_surp = shift_column(kosmos2_surp))%>%
+  mutate(prev_idefics_9b_surp = shift_column(idefics_9b_surp))%>%
+  mutate(prev_llava_7b_surp = shift_column(llava_7b_surp)) %>% group_by(WordToken,Group,Condition_ID.helm, Word) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),gpt2_surp = mean(gpt2_surp), llama2_surp = mean(llama2_surp),
+            llava_surp = mean(llava_7b_surp), idefics_surp = mean(idefics_9b_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT), prev_gpt2_surp = mean(prev_gpt2_surp),
+            prev_Frequency = mean(prev_Frequency),prev_Length=mean(prev_Length),prev_groundedness = mean(prev_groundedness),prev_llama2_surp = mean(prev_llama2_surp),prev_blip2_surp=mean(prev_blip2_surp),prev_kosmos2_surp=mean(prev_kosmos2_surp),prev_idefics_surp = mean(prev_idefics_9b_surp),prev_llava_surp=mean(prev_llava_7b_surp)) 
+  
+
+
+predictors <- c("gpt2_surp", "llama2_surp", "blip2_surp", "kosmos2_surp", "llava_surp", "idefics_surp")
+
+# Function to fit models for each predictor and condition
+fit_models <- function(predictor, data) {
+  # Construct the formula for the model
+  formula <- as.formula(paste("RT ~", predictor, sprintf(" + prev_%s",predictor), "+ Frequency + Length + Condition_ID.helm*groundedness + prev_Frequency + prev_Length + Condition_ID.helm*prev_groundedness + (Condition_ID.helm| Word) + (Condition_ID.helm | Group)"))
+  print(formula)
+  # Fit the model using lmer
+  model <- lmer(formula, data = data, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+  
+  return(model)
+}
+
+models <- list()
+for (predictor in predictors) {
+    models[[sprintf("prev_%s",predictor)]] <- fit_models(predictor, dataset_with_prev)
+}
+```
+
+```{r}
+model_post <- function(model,name_string){
+  
+  model_fixed <- tidy(model,effects="fixed") 
+  effects_of_interest <- c("Surprisal","Frequency","Length", "Change in Effect for Correct compared to wrong&no mean for 1 unit change in groundedness","groundedness")
+  model_fixed <- mutate(model_fixed, predictor_type = ifelse(grepl("^Condition_ID.helm2:prev", term) | grepl("^prev", term), "previous", "current"))
+  model_fixed <- mutate(model_fixed, term = ifelse(grepl("surp$", term), "Surprisal", term))
+  model_fixed$term[model_fixed$term == "prev_Frequency"] <- "Frequency"
+  model_fixed$term[model_fixed$term == "prev_Length"] <- "Length"
+  model_fixed$term[model_fixed$term == "prev_groundedness"] <- "groundedness"
+  model_fixed$term[model_fixed$term == "Condition_ID.helm2:groundedness"] <- "Change in Effect for Correct compared to wrong&no mean for 1 unit change in groundedness"
+  model_fixed$term[model_fixed$term == "Condition_ID.helm2:prev_groundedness"] <- "Change in Effect for Correct compared to wrong&no mean for 1 unit change in groundedness"
+  if (name_string=="gpt" | name_string=="llama"){
+    model_fixed <- model_fixed %>% mutate(model_type="Text")
+  }
+  else {
+    model_fixed <- model_fixed %>% mutate(model_type="Multimodal")
+  }
+  model_fixed <- switch(name_string,
+                        "gpt" = model_fixed %>% mutate(model="GPT2"),
+                        "llama" = model_fixed %>% mutate(model="LLAMA2"),
+                        "blip" = model_fixed %>% mutate(model="BLIP2"),
+                        "kosmos" = model_fixed %>% mutate(model="KOSMOS2"), 
+                        "llava" = model_fixed %>% mutate(model="LLAVA"),
+                        "idefics" = model_fixed %>% mutate(model="IDEFICS"))
+  print(model_fixed)
+  model_fixed <- model_fixed %>% filter(term %in% effects_of_interest)
+  return(model_fixed)
+}
+
+combined_model_condition <- function(){
+   combined_data <- rbind(model_post(models$prev_gpt2_surp,"gpt"),
+                          model_post(models$prev_llama2_surp,"llama"),
+                          model_post(models$prev_blip2_surp,"blip"),
+                          model_post(models$prev_kosmos2_surp,"kosmos"),
+                          model_post(models$prev_llava_surp,"llava"),
+                          model_post(models$prev_idefics_surp,"idefics"))
+
+ return(combined_data)
+}
+
+combined_all <- combined_model_condition()
+```
+
+```{r}
+library(dotwhisker)
+
+p1 <- dwplot(combined_all ,ci=.95, dot_args = list(aes(colour = model_type, shape = model)), whisker_args = list(aes(colour = model_type)), vline = geom_vline(
+        xintercept = 0,
+        colour = "grey60",
+        linetype = 2
+    )) + xlab("") + ylab("") +
+    ggtitle("") + scale_y_discrete(labels = function(y) 
+   stringr::str_wrap(y, width = 15)) + facet_wrap(~predictor_type) + theme_bw() 
+p1
+ggsave("plot_all.pdf")
+```
+
+
+```{r}
+combined_all
+```
+
+
+```{r}
+contrasts(correct_data$POS.sum) <- contr.sum(2)
+contrasts(wrong_data$POS.sum) <- contr.sum(2)
+contrasts(no_data$POS.sum) <- contr.sum(2)
+```
+
+# Power of one type of surprisal over other ones comparison
+One base model with each type of surprisal, another with all possible pairs of surprisal and then calculate log_like and stuff and make a table of those values 
+
+```{r}
+conditions <- c("correct", "wrong", "no")
+datasets <- list(correct_data, wrong_data, no_data)
+
+# List of predictors
+predictors <- c("gpt2_surp", "llama2_surp", "blip2_surp", "kosmos2_surp", "llava_7b_surp", "idefics_9b_surp")
+model_names <- c("gpt2","llama2","blip2","kosmos2","llava_7b","idefics_9b")
+
+# Function to fit models for each predictor and condition
+fit_models <- function(predictor, dataset) {
+  # Construct the formula for the model
+  formula <- as.formula(paste("RT ~", paste(predictor,"surp",sep="_"), "+ Frequency + Length + groundedness + POS.sum + (1 | WordToken) + (1 | Group) + (1 | Subject_ID)  + (1| Word)"))
+  print(formula)
+  # Fit the model using lmer
+  model <- lmer(formula, dataset, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+  
+  return(model)
+}
+
+models_power_comparison <- list()
+for (model_name in model_names) {
+  models_power_comparison[[paste(model_name, "correct", sep = "_")]] <- fit_models(model_name, correct_data)
+  models_power_comparison[[paste(model_name, "wrong", sep = "_")]] <- fit_models(model_name, wrong_data)
+  models_power_comparison[[paste(model_name, "no", sep = "_")]] <- fit_models(model_name, no_data)
+}
+```
+
+
+```{r}
+models_power_comparison
+```
+
+
+Doing the models with multiple predictors
+```{r}
+set_A <- c("gpt2", "llama2", "blip2", "kosmos2", "llava_7b", "idefics_9b")
+datasets <- list(correct_data, wrong_data, no_data)
+conditions <- c("correct", "wrong", "no")
+
+# Common predictors in c_predictor
+c_predictors <- c("groundedness","POS.sum","Frequency","Length", "(1 | WordToken)", "(1 | Group)", "(1 | Subject_ID)","(1 | Word)")  
+
+model_double_predictor <- list()
+
+# Generate all possible combinations of predictors from sets A and B
+fit_with_condition_data <- function(condition,dataset){
+  result <- list()
+    for (i in 1:6) {
+  a_predictor <- set_A[i]
+  if (i<=5){
+    for (j in (i+1):6) {
+    b_predictor <- set_A[j]
+    # Construct model equation
+    model_name1 <- paste(a_predictor,b_predictor,condition,sep="_")
+    model_name2 <- paste(b_predictor,a_predictor,condition,sep="_")
+    model_eq <- paste("RT ~", paste0(a_predictor,"_surp"), "+", paste0(b_predictor,"_surp"), "+", paste(c_predictors, collapse = "+"))
+    formula <- as.formula(model_eq)
+    result[[model_name1]] <- lmer(formula, data = dataset, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+    result[[model_name2]] <- result[[model_name1]] 
+  }
+  }
+    }
+  return(result)
+  
+}
+
+result1 <- fit_with_condition_data("correct",correct_data)
+result2 <- fit_with_condition_data("wrong",wrong_data)
+result3 <- fit_with_condition_data("no",no_data)
+
+
+```
+```{r}
+result <- c(result1,result2,result3)
+```
+
+
+```{r}
+do_comparison <- function(model_name1, model_name2){
+  #Assesing the power of model2 over model1 
+  if (model_name1 == model_name2) {return("")}
+  str1 <- paste0(model_name1,"_","wrong")
+  str2 <- paste0(model_name1, "_", model_name2,"_","wrong")
+  lm1 <- models_power_comparison[[str1]]
+  lm2 <- result[[str2]]
+  a <- anova(lm1,lm2)
+  fval <- anova(lm1,lm2)$Chisq[2] %>% round() 
+  pval <- anova(lm1,lm2)$`Pr(>Chisq)`[2] 
+  if (pval<0.0001) {pval <- paste0("p","<0.0001")}
+  else {pval <- paste0("p=",pval)}
+  return(str_c(fval," (",pval,")"))
+}
+
+log_like <- function(str1){
+  all_string <- paste0(str1,"_","wrong")
+  return(logLik(models_power_comparison[[all_string]])%>% round() %>% as.character())
+}
+
+```
+
+
+```{r}
+tab_correct  <- tibble(Model=c("gpt2", "llama2", "blip2", "kosmos2", "llava_7b", "idefics_9b"), model_str=c("gpt2", "llama2", "blip2", "kosmos2", "llava_7b", "idefics_9b"),`over GPT2`= "gpt2",
+             `over LLAMA2`= "llama2",`over BLIP2`= "blip2",`over KOSMOS2`= "kosmos2", `over LLAVA`="llava_7b",`over IDEFICS`="idefics_9b") %>% 
+   mutate(across(`over GPT2`:`over IDEFICS`, ~map2_chr(.x, model_str,do_comparison)), `Log Lik`=map_chr(model_str, log_like)) %>% dplyr::select(-model_str) 
+
+tab_correct %>% kbl(caption = "The outcomes of comparing models using Maze data from the 'Wrong Image' condition. Same condition as before",format= "html",align="r") %>% kable_classic(full_width = F, font="helvetica")
+
+```
+
+```{r}
+dataset_correct <- dataset_with_error %>% filter(correctness!="wrong")
+dataset_by_wordToken <- 
+  dataset_correct %>%
+  group_by(WordToken,Subject_ID,Group,Condition_ID, Word) %>%
+  summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),gpt2_surp = mean(gpt2_surp), llama2_surp = mean(llama2_surp),
+            llava_surp = mean(llava_7b_surp), idefics_surp = mean(idefics_9b_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT)) %>% group_by(WordToken,Group,Condition_ID, Word) %>% summarize(POS=POS[1],kosmos2_surp=mean(kosmos2_surp),blip2_surp = mean(blip2_surp),gpt2_surp = mean(gpt2_surp), llama2_surp = mean(llama2_surp),
+            llava_surp = mean(llava_surp), idefics_surp = mean(idefics_surp),Frequency=mean(Frequency),Length=mean(Length),groundedness=mean(groundedness),RT=mean(RT))
+contrasts(dataset_by_wordToken$POS) <- contr.sum(2)
+```
+```{r}
+#Models with two sources of surprisals 
+set_A <- c("gpt2", "llama2", "blip2", "kosmos2", "llava", "idefics")
+c_predictors <- c("Condition_ID*(groundedness + POS)","Frequency","Length", "(Condition_ID | Group)", "(Condition_ID| Word)") 
+
+fit_with_all_data <- function(dataset){
+  result <- list()
+    for (i in 1:6) {
+  a_predictor <- set_A[i]
+  if (i<=5){
+    for (j in (i+1):6) {
+    b_predictor <- set_A[j]
+    # Construct model equation
+    model_name1 <- paste(a_predictor,b_predictor,sep="_")
+    model_name2 <- paste(b_predictor,a_predictor,sep="_")
+    model_eq <- paste("RT ~", paste0(a_predictor,"_surp"), "+", paste0(b_predictor,"_surp"), "+", paste(c_predictors, collapse = "+"))
+    formula <- as.formula(model_eq)
+    result[[model_name1]] <- lmer(formula, data = dataset, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+    result[[model_name2]] <- result[[model_name1]] 
+  }
+  }
+    }
+  return(result)
+  
+}
+
+all_models_with_double_surprisal <- fit_with_all_data(dataset_by_wordToken)
+```
+
+```{r}
+#Models with single sources of surprisal 
+
+# List of predictors
+predictors <- c("gpt2_surp", "llama2_surp", "blip2_surp", "kosmos2_surp", "llava_surp", "idefics_surp")
+model_names <- c("gpt2","llama2","blip2","kosmos2","llava","idefics")
+
+# Function to fit models for each predictor and condition
+fit_models <- function(predictor, dataset) {
+  # Construct the formula for the model
+  formula <- as.formula(paste("RT ~", paste(predictor,"surp",sep="_"), "+ Frequency + Length + Condition_ID*(groundedness + POS) + (Condition_ID | Group) + (Condition_ID | Word)"))
+  print(formula)
+  # Fit the model using lmer
+  model <- lmer(formula, dataset, control=lmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 100000)), REML=F)
+  
+  return(model)
+}
+
+models_single_source <- list()
+for (model_name in model_names) {
+  models_single_source[[model_name]] <- fit_models(model_name, dataset_by_wordToken)
+}
+
+do_comparison <- function(model_name1, model_name2){
+  #Assesing the power of model2 over model1 
+  if (model_name1 == model_name2) {return("")}
+  str1 <- model_name1
+  str2 <- paste0(model_name1, "_", model_name2)
+  lm1 <- models_single_source[[str1]]
+  lm2 <- all_models_with_double_surprisal[[str2]]
+  a <- anova(lm1,lm2)
+  fval <- anova(lm1,lm2)$Chisq[2] %>% round() 
+  pval <- anova(lm1,lm2)$`Pr(>Chisq)`[2] 
+  if (pval<0.0001) {pval <- paste0("p","<0.0001")}
+  else {pval <- paste0("p=",pval)}
+  return(str_c(fval," (",pval,")"))
+}
+
+
+log_like <- function(str1){
+  all_string <- paste0(str1)
+  return(logLik(models_single_source[[all_string]])%>% round() %>% as.character())
+}
+```
+
+
+```{r}
+library(kableExtra)
+tab_correct  <- tibble(Model=c("gpt2", "llama2", "blip2", "kosmos2", "llava", "idefics"), model_str=c("gpt2", "llama2", "blip2", "kosmos2", "llava", "idefics"),`over GPT2`= "gpt2",
+             `over LLAMA2`= "llama2",`over BLIP2`= "blip2",`over KOSMOS2`= "kosmos2", `over LLAVA`="llava",`over IDEFICS`="idefics") %>% 
+   mutate(across(`over GPT2`:`over IDEFICS`, ~map2_chr(.x, model_str,do_comparison)), `Log Lik`=map_chr(model_str, log_like)) %>% dplyr::select(-model_str) 
+
+tab_correct %>% kbl(caption = "The outcomes of comparing models using Maze data from all conditions",format= "latex",align="r") %>% kable_classic(full_width = F, font="helvetica")
+
+```
+
+
+```{r}
+#se <- function(x) {
+  #return(sd(x) / sqrt(length(x)))
+#}
+
+rts_by_sentence <-
+  dataset_with_error %>%
+  filter(correctness!="wrong") %>%
+  group_by(WordToken,Condition_ID,Group,POS) %>%
+  summarize(RT=mean(RT),blip2_perplexity = mean(blip2_perplexity), kosmos2_perplexity = mean(kosmos2_perplexity),llava_7b_perplexity = mean(llava_7b_perplexity),idefics_9b_perplexity = mean(idefics_9b_perplexity), gpt2_perplexity = mean(gpt2_perplexity)) %>%
+  group_by(Condition_ID,Group,POS) %>%
+  summarize(rt_se = se(RT),RT=mean(RT), blip2_perplexity = mean(blip2_perplexity), kosmos2_perplexity = mean(kosmos2_perplexity),llava_7b_perplexity = mean(llava_7b_perplexity),idefics_9b_perplexity = mean(idefics_9b_perplexity),gpt2_perplexity = mean(gpt2_perplexity))
+
+data_no_correct_open <- rts_by_sentence %>% filter(Condition_ID!="correct") %>% filter(POS=="Open")
+data_correct_open <- rts_by_sentence %>% filter(Condition_ID=="correct") %>% filter(POS=="Open")
+
+data_no_correct_closed <- rts_by_sentence %>% filter(Condition_ID!="correct") %>% filter(POS=="Closed")
+data_correct_closed <- rts_by_sentence %>% filter(Condition_ID=="correct") %>% filter(POS=="Closed")
+
+
+p1 <- ggplot() +
+  geom_point(data = data_correct_open, aes(x = gpt2_perplexity, y = RT, color = "Correct")) +
+  geom_errorbar(data = data_correct_open, aes(x = gpt2_perplexity, ymin = RT - rt_se, ymax = RT + rt_se, color = "Correct"), width = 0) +
+  geom_point(data = data_no_correct_open, aes(x = gpt2_perplexity, y = RT, color = "Wrong & No", alpha = 0.2)) +
+  geom_errorbar(data = data_no_correct_open, aes(x = gpt2_perplexity, ymin = RT - rt_se, ymax = RT + rt_se, color = "Wrong & No", alpha = 0.2), width = 0) +
+  labs(x = "", y = "RT (Mean ± Standard Error)", color = "Data", title = "Open Class Words") +
+  scale_color_manual(values = c("Wrong & No" = "#F8766D", "Correct" = "#00BFC9")) +
+  theme_minimal() + theme(strip.text.x = element_blank()) + theme(legend.position = "None")
+
+p2 <- ggplot() +
+  geom_point(data = data_correct_closed, aes(x = gpt2_perplexity, y = RT, color = "Correct")) +
+  geom_errorbar(data = data_correct_closed, aes(x = gpt2_perplexity, ymin = RT - rt_se, ymax = RT + rt_se, color = "Correct"), width = 0) +
+  geom_point(data = data_no_correct_closed,  aes(x = gpt2_perplexity, y = RT, color = "Wrong & No"), alpha = 0.2) +
+  geom_errorbar(data = data_no_correct_closed, aes(x = gpt2_perplexity, ymin = RT - rt_se, ymax = RT + rt_se, color = "Wrong & No", alpha = 0.2), width = 0) +
+  labs(x = "GPT2 Perplexity", y = "RT (Mean ± Standard Error)", color = "Data", title = "Closed Class Words") +
+  scale_color_manual(values = c("Wrong & No" = "#F8766D", "Correct" = "#00BFC4")) +
+  theme_minimal()
+
+p1/p2
+ggsave("img/perplexity_RT_dist.pdf",width=12)
+```
+
+```{r}
+data_correct_closed$gpt2_perplexity
+```
+
