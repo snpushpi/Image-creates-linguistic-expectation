@@ -15,6 +15,13 @@ This repository contains the relevant codes and datasets for the publication [**
 
 - img: Just a folder containing most of the generated plots for the paper/thesis
 
-TODO: Add the link for the paper and the citation link when ready.
+If you find our work and dataset useful, consider citing our work!
+
+@inproceedings{pushpita-levy:2024-image-conditioned,
+  year = {In Press},
+  title = {Image-conditioned human language comprehension and psychometric benchmarking of visual language models},
+  booktitle = {Proceedings of the 28th Conference on Computational Natural Language Learning (CoNLL)},
+  author = {Pushpita, Subha Nawer and P. Levy, Roger}
+}
 
 
